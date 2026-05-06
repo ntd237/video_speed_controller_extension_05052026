@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Speed Controller - Cài đặt</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div id="options-container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="header-title">⚙ Video Speed Controller — Cài đặt</h1>
+    </div>
+
+    <!-- Mode Selection -->
+    <section class="section">
+      <h2 class="section-title">Chế độ hoạt động</h2>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="mode" value="blacklist" id="mode-blacklist">
+          <span>Blacklist (mặc định ở mọi nơi)</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="mode" value="whitelist" id="mode-whitelist">
+          <span>Whitelist (chỉ trang được chọn)</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Blacklist Section -->
+    <section class="section" id="blacklist-section" style="display: none;">
+      <h2 class="section-title">Danh sách Blacklist</h2>
+      <div class="domain-input-group">
+        <input type="text" id="blacklist-input" class="domain-input" placeholder="youtube.com">
+        <button id="blacklist-add-btn" class="btn btn-add">+ Thêm</button>
+      </div>
+      <div id="blacklist-list" class="domain-list"></div>
+    </section>
+
+    <!-- Whitelist Section -->
+    <section class="section" id="whitelist-section" style="display: none;">
+      <h2 class="section-title">Danh sách Whitelist</h2>
+      <div class="domain-input-group">
+        <input type="text" id="whitelist-input" class="domain-input" placeholder="youtube.com">
+        <button id="whitelist-add-btn" class="btn btn-add">+ Thêm</button>
+      </div>
+      <div id="whitelist-list" class="domain-list"></div>
+    </section>
+
+    <!-- Speed Settings -->
+    <section class="section">
+      <h2 class="section-title">Cài đặt tốc độ</h2>
+
+      <div class="setting-row">
+        <label for="step-size" class="label">Bước tăng/giảm:</label>
+        <input type="number" id="step-size" class="input-number" min="0.01" max="16" step="0.01" value="0.5">
+      </div>
+
+      <div class="setting-row">
+        <label for="default-speed" class="label">Tốc độ mặc định:</label>
+        <div class="slider-display-row">
+          <input type="range" id="default-speed" class="slider" min="0.1" max="16" step="0.05">
+          <span id="default-speed-value" class="speed-value">1.00x</span>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <label for="favorite-speed" class="label">Tốc độ yêu thích:</label>
+        <input type="number" id="favorite-speed" class="input-number" min="0.1" max="16" step="0.01" placeholder="Để trống nếu không dùng">
+      </div>
+    </section>
+
+    <!-- Display Settings -->
+    <section class="section">
+      <h2 class="section-title">Hiển thị</h2>
+
+      <div class="toggle-row">
+        <label for="show-overlay" class="label">Hiển thị overlay tốc độ</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="show-overlay">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <label for="overlay-opacity" class="label">Độ trong suốt:</label>
+        <div class="slider-display-row">
+          <input type="range" id="overlay-opacity" class="slider" min="0.1" max="1.0" step="0.05">
+          <span id="overlay-opacity-value" class="opacity-value">0.70</span>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label for="auto-apply" class="label">Tự động áp dụng tốc độ</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="auto-apply">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Keyboard Shortcuts -->
+    <section class="section">
+      <h2 class="section-title">Phím tắt (chỉ đọc)</h2>
+      <div class="shortcuts-list">
+        <div class="shortcut-item">
+          <span class="shortcut-key">D</span>
+          <span class="shortcut-desc">Tăng tốc độ</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">S</span>
+          <span class="shortcut-desc">Giảm tốc độ</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">R</span>
+          <span class="shortcut-desc">Reset về 1x</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">F</span>
+          <span class="shortcut-desc">Áp dụng yêu thích</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">V</span>
+          <span class="shortcut-desc">Hiện/ẩn overlay</span>
+        </div>
+      </div>
+      <p class="shortcuts-note">Tùy chỉnh tại chrome://extensions/shortcuts</p>
+    </section>
+
+    <!-- Save Button -->
+    <div class="save-section">
+      <button id="save-btn" class="btn btn-primary btn-save">💾 Lưu cài đặt</button>
+      <div id="save-message" class="save-message" style="display: none;">✓ Đã lưu!</div>
+    </div>
+  </div>
+
+  <script src="../config/defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
