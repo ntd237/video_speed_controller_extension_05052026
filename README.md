@@ -4,7 +4,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green)
-![License](https://img.shields.io/badge/license-MIT-brightgreen)
+![License](https://img.shields.io/badge/license-CC%20BY--NC--ND%204.0-lightgrey)
 
 ---
 
@@ -19,6 +19,7 @@
 - [Cấu hình](#cấu-hình)
 - [License](#license)
 - [Liên hệ](#liên-hệ)
+
 
 ---
 
@@ -73,7 +74,7 @@ Video Speed Controller cho phép:
 
 1. Clone hoặc tải về repository:
    ```bash
-   git clone https://github.com/ntd237/video_speed_controller_05052026.git
+   git clone https://github.com/ntd237/video_speed_controller_extension_05052026.git
    ```
 
 2. Mở Chrome và truy cập:
@@ -136,7 +137,7 @@ Các phím tắt hoạt động khi **trang web đang có focus** (không phải
 ## Cấu trúc dự án
 
 ```
-video_speed_controller_extension_05052026/
+video_speed_controller_extension_extension_05052026/
 ├── manifest.json           # Cấu hình extension (MV3)
 ├── config/
 │   └── defaults.js         # Hằng số mặc định dùng chung
@@ -189,6 +190,18 @@ Tất cả giá trị mặc định được khai báo trong `config/defaults.js
 | `minSpeed` | `0.1` | Tốc độ tối thiểu |
 | `maxSpeed` | `20.0` | Tốc độ tối đa |
 | `stepSizeOptions` | `[0.25, 0.5, 1.0, 2.0]` | Các preset bước nhảy trong UI |
+
+---
+
+## License
+
+Dự án này được phát hành dưới giấy phép **CC BY-NC-ND 4.0** (Creative Commons Attribution-NonCommercial-NoDerivatives 4.0):
+
+- **Được phép**: Tự do sao chép và chia sẻ với điều kiện ghi rõ nguồn
+- **Không được phép**: Chỉnh sửa, remix hoặc phát triển dựa trên mã nguồn
+- **Không được phép**: Sử dụng cho mục đích thương mại
+
+Xem toàn bộ nội dung tại: [LICENSE](LICENSE)
 
 ---
 

@@ -41,7 +41,7 @@
 ### Kiến trúc kỹ thuật
 
 ```
-video_speed_controller_extension/
+video_speed_controller_extension_extension/
 ├── manifest.json
 ├── config/defaults.js
 ├── content/content.js
