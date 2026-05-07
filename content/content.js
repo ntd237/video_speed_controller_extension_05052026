@@ -11,6 +11,9 @@
   // Set để theo dõi các video đã được xử lý
   const processedVideos = new WeakSet();
 
+  // Set để theo dõi các video đã có loadstart listener (tránh duplicate)
+  const videosWithLoadstartListener = new WeakSet();
+
   // MutationObserver để theo dõi video mới
   let mutationObserver = null;
 
@@ -200,6 +203,90 @@
 
       // Đánh dấu video đã được xử lý
       processedVideos.add(video);
+
+      // Xử lý race condition: nếu trình phát video reset playbackRate,
+      // ta sẽ re-apply tốc độ mong muốn. Sử dụng counter để tránh vòng lặp vô hạn.
+      let retryCount = 0;
+      const maxRetries = 10;
+      const handleRateChange = () => {
+        // Nếu tốc độ hiện tại khác tốc độ mong muốn, re-apply
+        if (Math.abs(video.playbackRate - clampedSpeed) > 0.01) {
+          retryCount++;
+          if (retryCount <= maxRetries) {
+            video.playbackRate = clampedSpeed;
+          } else {
+            // Đã retry đủ lần, xóa listener
+            video.removeEventListener('ratechange', handleRateChange);
+          }
+        } else {
+          // Tốc độ đã ổn định, xóa listener
+          video.removeEventListener('ratechange', handleRateChange);
+        }
+      };
+
+      video.addEventListener('ratechange', handleRateChange);
+
+      // Thêm loadstart listener để phát hiện khi video element tải nội dung mới
+      // (xử lý trường hợp SPA reuse video element)
+      // Chỉ thêm listener một lần để tránh duplicate
+      if (!videosWithLoadstartListener.has(video)) {
+        videosWithLoadstartListener.add(video);
+
+        const handleLoadstart = () => {
+          try {
+            // Xóa video khỏi processedVideos để cho phép re-apply tốc độ
+            processedVideos.delete(video);
+
+            // Xóa ratechange listener cũ
+            video.removeEventListener('ratechange', handleRateChange);
+
+            // Lấy settings mới nhất từ storage
+            chrome.storage.sync.get(DEFAULTS, (newSettings) => {
+              try {
+                if (newSettings.autoApply) {
+                  // Áp dụng tốc độ mới
+                  const newClampedSpeed = clampSpeed(newSettings.currentSpeed);
+                  video.playbackRate = newClampedSpeed;
+
+                  // Cập nhật overlay
+                  updateOverlay(video, newClampedSpeed, newSettings);
+
+                  // Đánh dấu video đã được xử lý
+                  processedVideos.add(video);
+
+                  // Thêm ratechange listener mới với retry logic
+                  let newRetryCount = 0;
+                  const newMaxRetries = 10;
+                  const newHandleRateChange = () => {
+                    if (Math.abs(video.playbackRate - newClampedSpeed) > 0.01) {
+                      newRetryCount++;
+                      if (newRetryCount <= newMaxRetries) {
+                        video.playbackRate = newClampedSpeed;
+                      } else {
+                        video.removeEventListener('ratechange', newHandleRateChange);
+                      }
+                    } else {
+                      video.removeEventListener('ratechange', newHandleRateChange);
+                    }
+                  };
+
+                  video.addEventListener('ratechange', newHandleRateChange);
+                } else {
+                  // Chỉ cập nhật overlay với playbackRate hiện tại
+                  updateOverlay(video, video.playbackRate || DEFAULTS.currentSpeed, newSettings);
+                  processedVideos.add(video);
+                }
+              } catch (error) {
+                console.error('Lỗi trong loadstart handler:', error);
+              }
+            });
+          } catch (error) {
+            console.error('Lỗi xử lý loadstart event:', error);
+          }
+        };
+
+        video.addEventListener('loadstart', handleLoadstart);
+      }
     } catch (error) {
       console.error('Lỗi khi áp dụng tốc độ cho video:', error);
     }
@@ -253,30 +340,38 @@
 
   /**
    * Khởi tạo MutationObserver để theo dõi video mới
-   * @param {Object} settings - Cài đặt từ storage
    */
-  function initMutationObserver(settings) {
+  function initMutationObserver() {
     if (mutationObserver) {
       mutationObserver.disconnect();
     }
 
     mutationObserver = new MutationObserver((mutations) => {
+      const newVideos = [];
+
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList') {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              // Kiểm tra xem node có phải là video không
               if (node.tagName === 'VIDEO') {
-                handleNewVideo(node, settings);
+                newVideos.push(node);
               }
-              // Kiểm tra xem node có chứa video không
               const videos = node.querySelectorAll('video');
               videos.forEach(video => {
-                handleNewVideo(video, settings);
+                newVideos.push(video);
               });
             }
           });
         }
+      });
+
+      if (newVideos.length === 0) return;
+
+      // Lấy settings mới nhất từ storage để tránh dùng closure cũ
+      chrome.storage.sync.get(DEFAULTS, (settings) => {
+        newVideos.forEach(video => {
+          handleNewVideo(video, settings);
+        });
       });
     });
 
@@ -322,7 +417,7 @@
     'd': 'speed-up',
     's': 'speed-down',
     'r': 'speed-reset',
-    'f': 'speed-favorite',
+    'g': 'speed-favorite',
     'v': 'toggle-overlay',
   };
 
@@ -390,7 +485,7 @@
       scanForVideos(settings);
 
       // Khởi tạo MutationObserver
-      initMutationObserver(settings);
+      initMutationObserver();
 
       // Khởi tạo lắng nghe tin nhắn
       initMessageListener();

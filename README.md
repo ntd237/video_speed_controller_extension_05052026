@@ -125,7 +125,7 @@ Các phím tắt hoạt động khi **trang web đang có focus** (không phải
 | `D` | Tăng tốc độ theo bước |
 | `S` | Giảm tốc độ theo bước |
 | `R` | Reset về 1x |
-| `F` | Áp dụng tốc độ yêu thích |
+| `G` | Áp dụng tốc độ yêu thích |
 | `V` | Ẩn / hiện overlay tốc độ |
 
 > Các phím tắt cũng hoạt động **bên trong popup** khi popup đang mở.
@@ -182,7 +182,7 @@ Tất cả giá trị mặc định được khai báo trong `config/defaults.js
 | `currentSpeed` | `1.0` | Tốc độ hiện tại |
 | `defaultSpeed` | `1.0` | Tốc độ reset (phím R) |
 | `stepSize` | `0.5` | Bước tăng/giảm mỗi lần nhấn phím |
-| `favoriteSpeed` | `3` | Tốc độ yêu thích (phím F) |
+| `favoriteSpeed` | `3` | Tốc độ yêu thích (phím G) |
 | `autoApply` | `true` | Tự động áp dụng tốc độ khi tải trang |
 | `showOverlay` | `true` | Hiển thị overlay tốc độ trên video |
 | `overlayOpacity` | `0.7` | Độ trong suốt overlay (0.1 – 1.0) |

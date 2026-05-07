@@ -331,12 +331,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// Keyboard shortcuts inside popup (D/S/R/F/V)
+// Keyboard shortcuts inside popup (D/S/R/G/V)
 const POPUP_KEY_MAP = {
   'd': 'speed-up',
   's': 'speed-down',
   'r': 'speed-reset',
-  'f': 'speed-favorite',
+  'g': 'speed-favorite',
   'v': 'toggle-overlay',
 };
 
