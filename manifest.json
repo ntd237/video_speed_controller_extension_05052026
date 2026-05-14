@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Video Speed Controller",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Điều chỉnh tốc độ video HTML5 trên mọi trang web",
   "permissions": [
     "storage",
@@ -15,7 +15,9 @@
     {
       "matches": ["<all_urls>"],
       "js": ["config/defaults.js", "content/content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
     }
   ],
   "background": {

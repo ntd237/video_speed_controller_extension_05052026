@@ -21,13 +21,29 @@
   // Hàm tiện ích
   // ============================================================================
 
+  function collectVideos(root) {
+    const videos = [];
+    const walker = (node) => {
+      if (node.tagName === 'VIDEO') videos.push(node);
+      if (node.shadowRoot) walker(node.shadowRoot);
+      for (const child of node.children || []) walker(child);
+    };
+    walker(root);
+    return videos;
+  }
+
   /**
    * Kiểm tra xem miền hiện tại có được phép hay không dựa trên cài đặt
    * @param {Object} settings - Cài đặt từ storage
    * @returns {boolean} true nếu miền được phép
    */
   function isDomainAllowed(settings) {
-    const hostname = location.hostname;
+    let hostname;
+    try {
+      hostname = window.top.location.hostname;
+    } catch (e) {
+      hostname = location.hostname;
+    }
     if (settings.mode === 'blacklist') {
       return !settings.blacklist.some(d => hostname.includes(d));
     } else {
@@ -49,7 +65,7 @@
    * @returns {number} Tốc độ phát lại hiện tại
    */
   function getCurrentSpeed() {
-    const videos = document.querySelectorAll('video');
+    const videos = collectVideos(document.documentElement);
     if (videos.length > 0) {
       return videos[0].playbackRate;
     }
@@ -176,7 +192,7 @@
    * @param {Object} settings - Cài đặt từ storage
    */
   function updateAllOverlays(settings) {
-    const videos = document.querySelectorAll('video');
+    const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
       const speed = video.playbackRate || DEFAULTS.currentSpeed;
       updateOverlay(video, speed, settings);
@@ -298,7 +314,7 @@
    * @param {Object} settings - Cài đặt từ storage
    */
   function applySpeedToAllVideos(speed, settings) {
-    const videos = document.querySelectorAll('video');
+    const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
       applySpeedToVideo(video, speed, settings);
     });
@@ -332,7 +348,7 @@
    * @param {Object} settings - Cài đặt từ storage
    */
   function scanForVideos(settings) {
-    const videos = document.querySelectorAll('video');
+    const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
       handleNewVideo(video, settings);
     });
@@ -353,13 +369,7 @@
         if (mutation.type === 'childList') {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.tagName === 'VIDEO') {
-                newVideos.push(node);
-              }
-              const videos = node.querySelectorAll('video');
-              videos.forEach(video => {
-                newVideos.push(video);
-              });
+              collectVideos(node).forEach(video => newVideos.push(video));
             }
           });
         }
