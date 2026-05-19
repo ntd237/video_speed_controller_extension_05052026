@@ -25,6 +25,7 @@ let currentDomain = '';
 let isBlacklistMode = DEFAULTS.mode === 'blacklist';
 let blacklist = [];
 let whitelist = [];
+let canControlCurrentTab = true;
 
 // Initialize popup
 async function initPopup() {
@@ -57,7 +58,9 @@ async function initPopup() {
         const response = await chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' });
         if (response && response.currentSpeed !== undefined) {
           currentSpeed = response.currentSpeed;
+          canControlCurrentTab = response.canControlSpeed !== false;
           updateSpeedDisplay();
+          updateSpeedControlsState();
         }
       } catch (err) {
         // Content script not available on this tab
@@ -72,6 +75,7 @@ async function initPopup() {
 function renderUI() {
   // Update speed display and slider
   updateSpeedDisplay();
+  updateSpeedControlsState();
 
   // Render step size presets
   renderStepPresets();
@@ -122,6 +126,13 @@ function updateSpeedDisplay() {
   const displaySpeed = currentSpeed.toFixed(2);
   speedDisplay.textContent = displaySpeed + 'x';
   speedSlider.value = currentSpeed.toString();
+}
+
+function updateSpeedControlsState() {
+  speedSlider.disabled = !canControlCurrentTab;
+  decreaseBtn.disabled = !canControlCurrentTab;
+  resetBtn.disabled = !canControlCurrentTab;
+  increaseBtn.disabled = !canControlCurrentTab;
 }
 
 // Update site toggle label
@@ -201,26 +212,38 @@ async function setSpeed(speed) {
   // Clamp and round
   speed = Math.max(DEFAULTS.minSpeed, Math.min(DEFAULTS.maxSpeed, speed));
   speed = Math.round(speed * 100) / 100;
-
-  currentSpeed = speed;
-
-  // Update display
-  updateSpeedDisplay();
-
-  // Save to storage
-  await chrome.storage.sync.set({ currentSpeed: speed });
+  let nextDisplaySpeed = speed;
+  let shouldPersist = true;
 
   // Send to content script
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tabs.length > 0) {
     try {
-      await chrome.tabs.sendMessage(tabs[0].id, {
+      const response = await chrome.tabs.sendMessage(tabs[0].id, {
         action: 'setSpeed',
         speed: speed
       });
+      if (response && response.currentSpeed !== undefined) {
+        nextDisplaySpeed = response.currentSpeed;
+      }
+      if (response && response.canControlSpeed === false) {
+        canControlCurrentTab = false;
+        shouldPersist = false;
+      } else {
+        canControlCurrentTab = true;
+      }
     } catch (err) {
       // Content script not available
+      canControlCurrentTab = true;
     }
+  }
+
+  currentSpeed = nextDisplaySpeed;
+  updateSpeedDisplay();
+  updateSpeedControlsState();
+
+  if (shouldPersist) {
+    await chrome.storage.sync.set({ currentSpeed: speed });
   }
 }
 
@@ -325,7 +348,7 @@ document.addEventListener('DOMContentLoaded', initPopup);
 // Live-update popup UI when storage changes from outside (keyboard shortcuts)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync') return;
-  if (changes.currentSpeed) {
+  if (changes.currentSpeed && canControlCurrentTab) {
     currentSpeed = changes.currentSpeed.newValue;
     updateSpeedDisplay();
   }

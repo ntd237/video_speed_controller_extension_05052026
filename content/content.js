@@ -14,6 +14,12 @@
   // Set để theo dõi các video đã có loadstart listener (tránh duplicate)
   const videosWithLoadstartListener = new WeakSet();
 
+  // WeakMap để quản lý ratechange listener hiện tại của mỗi video
+  const rateChangeListenerMap = new WeakMap();
+
+  // Các video đã được xác định là không thể thay đổi playbackRate
+  const speedLockedVideos = new WeakSet();
+
   // MutationObserver để theo dõi video mới
   let mutationObserver = null;
 
@@ -60,6 +66,126 @@
     return Math.min(DEFAULTS.maxSpeed, Math.max(DEFAULTS.minSpeed, speed));
   }
 
+  function getVideoPlaybackRate(video) {
+    if (speedLockedVideos.has(video) || isKnownUncontrollableVideo(video)) {
+      return DEFAULTS.currentSpeed;
+    }
+
+    const rate = Number(video.playbackRate);
+    return Number.isFinite(rate) ? rate : DEFAULTS.currentSpeed;
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function isKnownUncontrollableVideo(video) {
+    const isStreamSource =
+      typeof MediaStream !== 'undefined' &&
+      video.srcObject instanceof MediaStream;
+    const hasLoadedMetadata = video.readyState >= HTMLMediaElement.HAVE_METADATA;
+    const isInfiniteDuration = hasLoadedMetadata && !Number.isFinite(video.duration);
+
+    return isStreamSource || isInfiniteDuration;
+  }
+
+  function isPlaybackRateLocked(video, targetSpeed = getVideoPlaybackRate(video)) {
+    const actualSpeed = getVideoPlaybackRate(video);
+
+    return (
+      speedLockedVideos.has(video) ||
+      isKnownUncontrollableVideo(video) ||
+      (
+        Math.abs(targetSpeed - actualSpeed) > 0.01 &&
+        Math.abs(actualSpeed - DEFAULTS.currentSpeed) <= 0.01
+      )
+    );
+  }
+
+  function hasControllableVideo() {
+    const videos = collectVideos(document.documentElement);
+    if (videos.length === 0) {
+      return true;
+    }
+
+    return videos.some(video => !isPlaybackRateLocked(video));
+  }
+
+  function removeRateChangeListener(video) {
+    const listener = rateChangeListenerMap.get(video);
+    if (!listener) {
+      return;
+    }
+
+    video.removeEventListener('ratechange', listener);
+    rateChangeListenerMap.delete(video);
+  }
+
+  function attachRateChangeListener(video, targetSpeed, settings) {
+    removeRateChangeListener(video);
+
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const handleRateChange = async () => {
+      const actualSpeed = getVideoPlaybackRate(video);
+
+      if (Math.abs(actualSpeed - targetSpeed) <= 0.01) {
+        speedLockedVideos.delete(video);
+        updateOverlay(video, actualSpeed, settings);
+        return;
+      }
+
+      retryCount++;
+      if (retryCount > maxRetries || isPlaybackRateLocked(video, targetSpeed)) {
+        speedLockedVideos.add(video);
+        removeRateChangeListener(video);
+        updateOverlay(video, getVideoPlaybackRate(video), settings);
+        return;
+      }
+
+      video.playbackRate = targetSpeed;
+      await wait(120);
+      updateOverlay(video, getVideoPlaybackRate(video), settings);
+    };
+
+    rateChangeListenerMap.set(video, handleRateChange);
+    video.addEventListener('ratechange', handleRateChange);
+  }
+
+  function ensureLoadstartListener(video) {
+    if (videosWithLoadstartListener.has(video)) {
+      return;
+    }
+
+    videosWithLoadstartListener.add(video);
+
+    const handleLoadstart = () => {
+      try {
+        processedVideos.delete(video);
+        speedLockedVideos.delete(video);
+        removeRateChangeListener(video);
+
+        chrome.storage.sync.get(DEFAULTS, (newSettings) => {
+          try {
+            if (newSettings.autoApply) {
+              void applySpeedToVideo(video, newSettings.currentSpeed, newSettings);
+            } else {
+              updateOverlay(video, getVideoPlaybackRate(video), newSettings);
+              processedVideos.add(video);
+            }
+          } catch (error) {
+            console.error('Lỗi trong loadstart handler:', error);
+          }
+        });
+      } catch (error) {
+        console.error('Lỗi xử lý loadstart event:', error);
+      }
+    };
+
+    video.addEventListener('loadstart', handleLoadstart);
+  }
+
   /**
    * Lấy tốc độ phát lại hiện tại từ video đầu tiên (nếu có)
    * @returns {number} Tốc độ phát lại hiện tại
@@ -67,7 +193,7 @@
   function getCurrentSpeed() {
     const videos = collectVideos(document.documentElement);
     if (videos.length > 0) {
-      return videos[0].playbackRate;
+      return getVideoPlaybackRate(videos[0]);
     }
     return DEFAULTS.currentSpeed;
   }
@@ -194,7 +320,7 @@
   function updateAllOverlays(settings) {
     const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
-      const speed = video.playbackRate || DEFAULTS.currentSpeed;
+      const speed = getVideoPlaybackRate(video);
       updateOverlay(video, speed, settings);
     });
   }
@@ -209,102 +335,61 @@
    * @param {number} speed - Tốc độ cần áp dụng
    * @param {Object} settings - Cài đặt từ storage
    */
-  function applySpeedToVideo(video, speed, settings) {
+  async function applySpeedToVideo(video, speed, settings) {
     try {
       const clampedSpeed = clampSpeed(speed);
-      video.playbackRate = clampedSpeed;
+      removeRateChangeListener(video);
 
-      // Tạo hoặc cập nhật overlay
-      updateOverlay(video, clampedSpeed, settings);
+      if (isKnownUncontrollableVideo(video)) {
+        speedLockedVideos.add(video);
+        video.playbackRate = DEFAULTS.currentSpeed;
+        updateOverlay(video, DEFAULTS.currentSpeed, settings);
+        processedVideos.add(video);
+        ensureLoadstartListener(video);
+        return {
+          applied: false,
+          canControlSpeed: false,
+          currentSpeed: DEFAULTS.currentSpeed,
+        };
+      }
+
+      video.playbackRate = clampedSpeed;
+      await wait(120);
+
+      const actualSpeed = getVideoPlaybackRate(video);
+      const isApplied = Math.abs(actualSpeed - clampedSpeed) <= 0.01;
+      const canControlSpeed = isApplied || !isPlaybackRateLocked(video, clampedSpeed);
+
+      if (canControlSpeed) {
+        speedLockedVideos.delete(video);
+      } else {
+        speedLockedVideos.add(video);
+      }
+
+      // Overlay luôn phản ánh playbackRate thực tế của video.
+      updateOverlay(video, isApplied ? clampedSpeed : actualSpeed, settings);
 
       // Đánh dấu video đã được xử lý
       processedVideos.add(video);
 
-      // Xử lý race condition: nếu trình phát video reset playbackRate,
-      // ta sẽ re-apply tốc độ mong muốn. Sử dụng counter để tránh vòng lặp vô hạn.
-      let retryCount = 0;
-      const maxRetries = 10;
-      const handleRateChange = () => {
-        // Nếu tốc độ hiện tại khác tốc độ mong muốn, re-apply
-        if (Math.abs(video.playbackRate - clampedSpeed) > 0.01) {
-          retryCount++;
-          if (retryCount <= maxRetries) {
-            video.playbackRate = clampedSpeed;
-          } else {
-            // Đã retry đủ lần, xóa listener
-            video.removeEventListener('ratechange', handleRateChange);
-          }
-        } else {
-          // Tốc độ đã ổn định, xóa listener
-          video.removeEventListener('ratechange', handleRateChange);
-        }
-      };
-
-      video.addEventListener('ratechange', handleRateChange);
-
-      // Thêm loadstart listener để phát hiện khi video element tải nội dung mới
-      // (xử lý trường hợp SPA reuse video element)
-      // Chỉ thêm listener một lần để tránh duplicate
-      if (!videosWithLoadstartListener.has(video)) {
-        videosWithLoadstartListener.add(video);
-
-        const handleLoadstart = () => {
-          try {
-            // Xóa video khỏi processedVideos để cho phép re-apply tốc độ
-            processedVideos.delete(video);
-
-            // Xóa ratechange listener cũ
-            video.removeEventListener('ratechange', handleRateChange);
-
-            // Lấy settings mới nhất từ storage
-            chrome.storage.sync.get(DEFAULTS, (newSettings) => {
-              try {
-                if (newSettings.autoApply) {
-                  // Áp dụng tốc độ mới
-                  const newClampedSpeed = clampSpeed(newSettings.currentSpeed);
-                  video.playbackRate = newClampedSpeed;
-
-                  // Cập nhật overlay
-                  updateOverlay(video, newClampedSpeed, newSettings);
-
-                  // Đánh dấu video đã được xử lý
-                  processedVideos.add(video);
-
-                  // Thêm ratechange listener mới với retry logic
-                  let newRetryCount = 0;
-                  const newMaxRetries = 10;
-                  const newHandleRateChange = () => {
-                    if (Math.abs(video.playbackRate - newClampedSpeed) > 0.01) {
-                      newRetryCount++;
-                      if (newRetryCount <= newMaxRetries) {
-                        video.playbackRate = newClampedSpeed;
-                      } else {
-                        video.removeEventListener('ratechange', newHandleRateChange);
-                      }
-                    } else {
-                      video.removeEventListener('ratechange', newHandleRateChange);
-                    }
-                  };
-
-                  video.addEventListener('ratechange', newHandleRateChange);
-                } else {
-                  // Chỉ cập nhật overlay với playbackRate hiện tại
-                  updateOverlay(video, video.playbackRate || DEFAULTS.currentSpeed, newSettings);
-                  processedVideos.add(video);
-                }
-              } catch (error) {
-                console.error('Lỗi trong loadstart handler:', error);
-              }
-            });
-          } catch (error) {
-            console.error('Lỗi xử lý loadstart event:', error);
-          }
-        };
-
-        video.addEventListener('loadstart', handleLoadstart);
+      if (canControlSpeed) {
+        attachRateChangeListener(video, clampedSpeed, settings);
       }
+
+      ensureLoadstartListener(video);
+
+      return {
+        applied: isApplied,
+        canControlSpeed,
+        currentSpeed: isApplied ? clampedSpeed : actualSpeed,
+      };
     } catch (error) {
       console.error('Lỗi khi áp dụng tốc độ cho video:', error);
+      return {
+        applied: false,
+        canControlSpeed: false,
+        currentSpeed: getVideoPlaybackRate(video),
+      };
     }
   }
 
@@ -313,11 +398,23 @@
    * @param {number} speed - Tốc độ cần áp dụng
    * @param {Object} settings - Cài đặt từ storage
    */
-  function applySpeedToAllVideos(speed, settings) {
+  async function applySpeedToAllVideos(speed, settings) {
     const videos = collectVideos(document.documentElement);
-    videos.forEach(video => {
-      applySpeedToVideo(video, speed, settings);
-    });
+    if (videos.length === 0) {
+      return {
+        applied: true,
+        canControlSpeed: true,
+        currentSpeed: clampSpeed(speed),
+      };
+    }
+
+    const results = await Promise.all(videos.map(video => applySpeedToVideo(video, speed, settings)));
+
+    return {
+      applied: results.some(result => result.applied),
+      canControlSpeed: results.some(result => result.canControlSpeed),
+      currentSpeed: results[0].currentSpeed,
+    };
   }
 
   // ============================================================================
@@ -335,10 +432,10 @@
     }
 
     if (settings.autoApply) {
-      applySpeedToVideo(video, settings.currentSpeed, settings);
+      void applySpeedToVideo(video, settings.currentSpeed, settings);
     } else {
       // Vẫn tạo overlay nhưng không áp dụng tốc độ
-      updateOverlay(video, video.playbackRate || DEFAULTS.currentSpeed, settings);
+      updateOverlay(video, getVideoPlaybackRate(video), settings);
       processedVideos.add(video);
     }
   }
@@ -403,14 +500,34 @@
       try {
         if (msg.action === 'setSpeed') {
           chrome.storage.sync.get(DEFAULTS, (settings) => {
-            applySpeedToAllVideos(msg.speed, settings);
-            sendResponse({ ok: true });
+            void applySpeedToAllVideos(msg.speed, settings)
+              .then((result) => {
+                sendResponse({ ok: true, ...result });
+              })
+              .catch((error) => {
+                console.error('Lỗi áp dụng tốc độ từ message:', error);
+                sendResponse({ ok: false, error: error.message });
+              });
           });
           return true; // Giữ channel mở cho sendResponse không đồng bộ
         }
 
         if (msg.action === 'getStatus') {
-          sendResponse({ currentSpeed: getCurrentSpeed() });
+          const videos = collectVideos(document.documentElement);
+          if (videos.length === 0) {
+            chrome.storage.sync.get(DEFAULTS, (settings) => {
+              sendResponse({
+                currentSpeed: settings.currentSpeed,
+                canControlSpeed: true,
+              });
+            });
+            return true;
+          }
+
+          sendResponse({
+            currentSpeed: getCurrentSpeed(),
+            canControlSpeed: hasControllableVideo(),
+          });
         }
       } catch (error) {
         console.error('Lỗi xử lý tin nhắn:', error);
@@ -465,7 +582,7 @@
 
         // Áp dụng tốc độ mới nếu currentSpeed thay đổi
         if (changes.currentSpeed) {
-          applySpeedToAllVideos(changes.currentSpeed.newValue, settings);
+          void applySpeedToAllVideos(changes.currentSpeed.newValue, settings);
         }
 
         // Nếu autoApply thay đổi, có thể cần xử lý lại

@@ -46,15 +46,18 @@ async function handleCommand(command, tab) {
     // Làm tròn tốc độ đến 2 chữ số thập phân để tránh lỗi floating point
     newSpeed = Math.round(newSpeed * 100) / 100;
 
-    await chrome.storage.sync.set({ currentSpeed: newSpeed });
-
     if (tab) {
       try {
-        await chrome.tabs.sendMessage(tab.id, { action: 'setSpeed', speed: newSpeed });
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'setSpeed', speed: newSpeed });
+        if (response?.canControlSpeed === false) {
+          return;
+        }
       } catch (error) {
         console.debug('Không thể gửi tin nhắn đến tab:', error.message);
       }
     }
+
+    await chrome.storage.sync.set({ currentSpeed: newSpeed });
   } catch (error) {
     console.error('Lỗi xử lý lệnh:', error);
   }
