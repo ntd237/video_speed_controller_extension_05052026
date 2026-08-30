@@ -5,20 +5,20 @@ document.addEventListener('DOMContentLoaded', initializeOptions);
 document.getElementById('mode-blacklist').addEventListener('change', handleModeChange);
 document.getElementById('mode-whitelist').addEventListener('change', handleModeChange);
 
-document.getElementById('blacklist-add-btn').addEventListener('click', () => addDomain('blacklist'));
-document.getElementById('whitelist-add-btn').addEventListener('click', () => addDomain('whitelist'));
+document.getElementById('blacklist-add-btn').addEventListener('click', () => saveDomainList('blacklist'));
+document.getElementById('whitelist-add-btn').addEventListener('click', () => saveDomainList('whitelist'));
 
-document.getElementById('blacklist-input').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') addDomain('blacklist');
-});
-document.getElementById('whitelist-input').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') addDomain('whitelist');
-});
+// Nút Lưu chỉ bật khi textarea có thay đổi so với lần lưu gần nhất
+document.getElementById('blacklist-input').addEventListener('input', () => updateSaveButtonState('blacklist'));
+document.getElementById('whitelist-input').addEventListener('input', () => updateSaveButtonState('whitelist'));
 
 document.getElementById('default-speed').addEventListener('input', updateDefaultSpeedDisplay);
 document.getElementById('overlay-opacity').addEventListener('input', updateOpacityDisplay);
 
 document.getElementById('save-btn').addEventListener('click', saveSettings);
+
+// Snapshot nội dung đã lưu của mỗi danh sách để so sánh trạng thái nút Lưu
+const savedSnapshots = {};
 
 // Initialize options page
 function initializeOptions() {
@@ -50,9 +50,13 @@ function initializeOptions() {
     document.getElementById('show-overlay').checked = settings.showOverlay;
     document.getElementById('auto-apply').checked = settings.autoApply;
 
-    // Populate domain lists
-    renderDomainList('blacklist', settings.blacklist);
-    renderDomainList('whitelist', settings.whitelist);
+    // Nạp sẵn danh sách đã lưu vào textarea (mỗi dòng một entry)
+    savedSnapshots.blacklist = settings.blacklist.join('\n');
+    savedSnapshots.whitelist = settings.whitelist.join('\n');
+    document.getElementById('blacklist-input').value = savedSnapshots.blacklist;
+    document.getElementById('whitelist-input').value = savedSnapshots.whitelist;
+    updateSaveButtonState('blacklist');
+    updateSaveButtonState('whitelist');
   });
 }
 
@@ -76,90 +80,40 @@ function updateModeVisibility(mode) {
   }
 }
 
-// Add domain to list
-function addDomain(listType) {
+// Bật nút Lưu khi nội dung textarea khác với lần lưu gần nhất, tắt khi đã khớp
+function updateSaveButtonState(listType) {
+  const input = document.getElementById(`${listType}-input`);
+  const btn = document.getElementById(`${listType}-add-btn`);
+  btn.disabled = input.value === savedSnapshots[listType];
+}
+
+// Save toàn bộ danh sách từ textarea (textarea là trình soạn thảo của danh sách,
+// nội dung khi bấm Lưu sẽ thay thế hoàn toàn danh sách đã lưu)
+function saveDomainList(listType) {
   const inputId = `${listType}-input`;
   const input = document.getElementById(inputId);
-  let domain = input.value.trim();
 
-  // Validate domain
-  if (!domain) {
-    alert('Vui lòng nhập tên miền');
+  // Tách theo dòng, trim, bỏ dòng rỗng, strip http/https prefix
+  const entries = input.value
+    .split('\n')
+    .map((line) => line.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''))
+    .filter((line) => line.length > 0);
+
+  // Gom các entry không hợp lệ vào một alert duy nhất, chặn toàn bộ lần lưu này
+  const invalid = entries.filter((entry) => !isValidSiteEntry(entry));
+  if (invalid.length > 0) {
+    alert('Tên miền không hợp lệ:\n' + invalid.join('\n'));
     return;
   }
 
-  // Strip http/https prefix if present
-  domain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-  // Basic domain/IP validation (hỗ trợ domain, IPv4/IPv6, kèm hoặc không kèm port)
-  if (!isValidSiteEntry(domain)) {
-    alert('Tên miền không hợp lệ');
-    return;
-  }
-
-  // Get current list
-  chrome.storage.sync.get([listType], (result) => {
-    const list = result[listType] || DEFAULTS[listType];
-
-    // Check if domain already exists
-    if (list.includes(domain)) {
-      alert('Tên miền này đã có trong danh sách');
-      return;
-    }
-
-    // Add domain
-    list.push(domain);
-    chrome.storage.sync.set({ [listType]: list }, () => {
-      renderDomainList(listType, list);
-      input.value = '';
-      input.focus();
-    });
+  // Bỏ dòng trùng lặp (giữ lần xuất hiện đầu), ghi đè toàn bộ danh sách
+  const newList = [...new Set(entries)];
+  chrome.storage.sync.set({ [listType]: newList }, () => {
+    savedSnapshots[listType] = newList.join('\n');
+    input.value = savedSnapshots[listType];
+    updateSaveButtonState(listType);
+    input.focus();
   });
-}
-
-// Remove domain from list
-function removeDomain(listType, domain) {
-  chrome.storage.sync.get([listType], (result) => {
-    let list = result[listType] || DEFAULTS[listType];
-    list = list.filter((d) => d !== domain);
-    chrome.storage.sync.set({ [listType]: list }, () => {
-      renderDomainList(listType, list);
-    });
-  });
-}
-
-// Render domain list
-function renderDomainList(listType, domains) {
-  const listContainer = document.getElementById(`${listType}-list`);
-  listContainer.innerHTML = '';
-
-  if (domains.length === 0) {
-    listContainer.innerHTML = '<p class="empty-list">Danh sách trống</p>';
-    return;
-  }
-
-  const ul = document.createElement('ul');
-  ul.className = 'domain-items';
-
-  domains.forEach((domain) => {
-    const li = document.createElement('li');
-    li.className = 'domain-item';
-
-    const domainSpan = document.createElement('span');
-    domainSpan.className = 'domain-name';
-    domainSpan.textContent = domain;
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'btn btn-remove';
-    removeBtn.textContent = 'Xóa';
-    removeBtn.addEventListener('click', () => removeDomain(listType, domain));
-
-    li.appendChild(domainSpan);
-    li.appendChild(removeBtn);
-    ul.appendChild(li);
-  });
-
-  listContainer.appendChild(ul);
 }
 
 // Update default speed display

@@ -89,70 +89,71 @@ body {
 
 /* Domain Input Group */
 .domain-input-group {
-  display: flex;
-  gap: 8px;
   margin-bottom: 12px;
 }
 
-.domain-input {
-  flex: 1;
+/* Textarea nhập nhiều trang web, mỗi dòng một entry.
+   Chiều cao cố định; tràn thì cuộn dọc. */
+.domain-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 240px;
   padding: 8px 12px;
   background-color: #313244;
   color: #cdd6f4;
   border: 1px solid #45475a;
   border-radius: 6px;
   font-size: 14px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow-y: auto;
   transition: all 150ms ease;
 }
 
-.domain-input:hover {
+.domain-textarea:hover {
   border-color: #89b4fa;
 }
 
-.domain-input:focus {
+.domain-textarea:focus {
   outline: none;
   border-color: #89b4fa;
   box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
 }
 
-.domain-input::placeholder {
+.domain-textarea::placeholder {
   color: #6c7086;
 }
 
-/* Domain List */
-.domain-list {
-  margin-top: 12px;
+/* Thanh cuộn của textarea */
+.domain-textarea::-webkit-scrollbar {
+  width: 10px;
 }
 
-.empty-list {
-  font-size: 13px;
-  color: #6c7086;
-  text-align: center;
-  padding: 12px;
-  font-style: italic;
+.domain-textarea::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.domain-items {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.domain-textarea::-webkit-scrollbar-thumb {
+  background-color: #45475a;
+  border-radius: 5px;
+  border: 2px solid #313244;
 }
 
-.domain-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  background-color: #313244;
-  border-radius: 6px;
-  border: 1px solid #45475a;
+.domain-textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #6c7086;
 }
 
-.domain-name {
-  font-size: 14px;
-  color: #cdd6f4;
-  word-break: break-all;
+.domain-save-btn {
+  margin-top: 8px;
+}
+
+/* Nút Lưu khi không có thay đổi (đã lưu hoặc chưa chỉnh sửa) */
+.domain-save-btn:disabled {
+  background-color: #585b70;
+  color: #a6adc8;
+  cursor: not-allowed;
 }
 
 /* Setting Row */
@@ -430,22 +431,6 @@ input:focus + .toggle-slider {
   transform: scale(0.98);
 }
 
-.btn-remove {
-  background-color: #f38ba8;
-  color: #1e1e2e;
-  padding: 6px 12px;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.btn-remove:hover:not(:disabled) {
-  background-color: #eba0ac;
-}
-
-.btn-remove:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
 /* Save Section */
 .save-section {
   margin-top: 24px;
@@ -501,10 +486,6 @@ input:focus + .toggle-slider {
   .section {
     margin-bottom: 16px;
     padding-bottom: 16px;
-  }
-
-  .domain-input-group {
-    flex-direction: column;
   }
 
   .btn-add {
