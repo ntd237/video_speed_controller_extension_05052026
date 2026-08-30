@@ -22,6 +22,7 @@ let stepSize = DEFAULTS.stepSize;
 let favoriteSpeed = DEFAULTS.favoriteSpeed;
 let overlayOpacity = DEFAULTS.overlayOpacity;
 let currentDomain = '';
+let currentPagePort = '';
 let isBlacklistMode = DEFAULTS.mode === 'blacklist';
 let blacklist = [];
 let whitelist = [];
@@ -46,6 +47,7 @@ async function initPopup() {
     if (tabs.length > 0) {
       const url = new URL(tabs[0].url);
       currentDomain = url.hostname;
+      currentPagePort = url.port || (url.protocol === 'https:' ? '443' : '80');
     }
 
     // Render UI
@@ -148,10 +150,10 @@ function updateSiteToggleLabel() {
 function isSiteEnabled() {
   if (isBlacklistMode) {
     // In blacklist mode, enabled if NOT in blacklist
-    return !blacklist.includes(currentDomain);
+    return !blacklist.some((d) => matchesSiteEntry(d, currentDomain, currentPagePort));
   } else {
     // In whitelist mode, enabled if in whitelist
-    return whitelist.includes(currentDomain);
+    return whitelist.some((d) => matchesSiteEntry(d, currentDomain, currentPagePort));
   }
 }
 

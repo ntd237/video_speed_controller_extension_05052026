@@ -91,8 +91,8 @@ function addDomain(listType) {
   // Strip http/https prefix if present
   domain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-  // Basic domain validation
-  if (!isValidDomain(domain)) {
+  // Basic domain/IP validation (hỗ trợ domain, IPv4/IPv6, kèm hoặc không kèm port)
+  if (!isValidSiteEntry(domain)) {
     alert('Tên miền không hợp lệ');
     return;
   }
@@ -160,13 +160,6 @@ function renderDomainList(listType, domains) {
   });
 
   listContainer.appendChild(ul);
-}
-
-// Validate domain format
-function isValidDomain(domain) {
-  // Simple domain validation: must contain at least one dot or be localhost
-  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$|^localhost$/;
-  return domainRegex.test(domain);
 }
 
 // Update default speed display

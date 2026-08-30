@@ -44,16 +44,19 @@
    * @returns {boolean} true nếu miền được phép
    */
   function isDomainAllowed(settings) {
-    let hostname;
+    let loc;
     try {
-      hostname = window.top.location.hostname;
+      loc = window.top.location;
     } catch (e) {
-      hostname = location.hostname;
+      loc = location;
     }
+    const hostname = loc.hostname;
+    // Map port mặc định (location.port rỗng với http/https thường) để khớp entry có port 80/443
+    const port = loc.port || (loc.protocol === 'https:' ? '443' : '80');
     if (settings.mode === 'blacklist') {
-      return !settings.blacklist.some(d => hostname.includes(d));
+      return !settings.blacklist.some((d) => matchesSiteEntry(d, hostname, port));
     } else {
-      return settings.whitelist.some(d => hostname.includes(d));
+      return settings.whitelist.some((d) => matchesSiteEntry(d, hostname, port));
     }
   }
 
