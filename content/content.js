@@ -44,15 +44,17 @@
    * @returns {boolean} true nếu miền được phép
    */
   function isDomainAllowed(settings) {
-    let loc;
+    let hostname, port;
     try {
-      loc = window.top.location;
+      // Ở frame cross-origin, window.top.location trả về được object nhưng
+      // đọc hostname/port/protocol trên nó bị chặn (SecurityError) nên toàn
+      // bộ việc đọc phải nằm trong try; khi đó dùng hostname của chính frame.
+      hostname = window.top.location.hostname;
+      port = window.top.location.port || (window.top.location.protocol === 'https:' ? '443' : '80');
     } catch (e) {
-      loc = location;
+      hostname = location.hostname;
+      port = location.port || (location.protocol === 'https:' ? '443' : '80');
     }
-    const hostname = loc.hostname;
-    // Map port mặc định (location.port rỗng với http/https thường) để khớp entry có port 80/443
-    const port = loc.port || (loc.protocol === 'https:' ? '443' : '80');
     if (settings.mode === 'blacklist') {
       return !settings.blacklist.some((d) => matchesSiteEntry(d, hostname, port));
     } else {
@@ -80,6 +82,37 @@
 
   function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Đọc cài đặt qua service worker.
+   * Trong cross-origin iframe, callback của chrome.storage.sync.get có thể
+   * không bao giờ được gọi, nên message channel (vẫn hoạt động ở mọi frame)
+   * là đường đọc cài đặt đáng tin cậy; storage.get chỉ là fallback.
+   */
+  function getSettings(callback) {
+    let settled = false;
+    const once = (settings) => {
+      if (settled) return;
+      settled = true;
+      callback({ ...DEFAULTS, ...settings });
+    };
+    const fallback = () => chrome.storage.sync.get(DEFAULTS, once);
+    let timer = null;
+    try {
+      timer = setTimeout(fallback, DEFAULTS.settingsRequestTimeoutMs);
+      chrome.runtime.sendMessage({ action: 'getSettings' }, (settings) => {
+        clearTimeout(timer);
+        if (chrome.runtime.lastError || !settings) {
+          fallback();
+          return;
+        }
+        once(settings);
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      fallback();
+    }
   }
 
   function isKnownUncontrollableVideo(video) {
@@ -169,7 +202,7 @@
         speedLockedVideos.delete(video);
         removeRateChangeListener(video);
 
-        chrome.storage.sync.get(DEFAULTS, (newSettings) => {
+        getSettings((newSettings) => {
           try {
             if (newSettings.autoApply) {
               void applySpeedToVideo(video, newSettings.currentSpeed, newSettings);
@@ -478,7 +511,7 @@
       if (newVideos.length === 0) return;
 
       // Lấy settings mới nhất từ storage để tránh dùng closure cũ
-      chrome.storage.sync.get(DEFAULTS, (settings) => {
+      getSettings((settings) => {
         newVideos.forEach(video => {
           handleNewVideo(video, settings);
         });
@@ -502,7 +535,7 @@
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         if (msg.action === 'setSpeed') {
-          chrome.storage.sync.get(DEFAULTS, (settings) => {
+          getSettings((settings) => {
             void applySpeedToAllVideos(msg.speed, settings)
               .then((result) => {
                 sendResponse({ ok: true, ...result });
@@ -518,7 +551,7 @@
         if (msg.action === 'getStatus') {
           const videos = collectVideos(document.documentElement);
           if (videos.length === 0) {
-            chrome.storage.sync.get(DEFAULTS, (settings) => {
+            getSettings((settings) => {
               sendResponse({
                 currentSpeed: settings.currentSpeed,
                 canControlSpeed: true,
@@ -577,7 +610,7 @@
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'sync') return;
 
-      chrome.storage.sync.get(DEFAULTS, (settings) => {
+      getSettings((settings) => {
         // Cập nhật overlay nếu showOverlay hoặc overlayOpacity thay đổi
         if (changes.showOverlay || changes.overlayOpacity) {
           updateAllOverlays(settings);
@@ -604,7 +637,7 @@
    * Khởi tạo content script
    */
   function init() {
-    chrome.storage.sync.get(DEFAULTS, (settings) => {
+    getSettings((settings) => {
       // Kiểm tra xem miền có được phép không
       if (!isDomainAllowed(settings)) {
         console.log('Miền này không được phép sử dụng Video Speed Controller');

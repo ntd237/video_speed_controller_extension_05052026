@@ -6,6 +6,14 @@ importScripts('../config/defaults.js');
  * Lắng nghe tin nhắn từ content script (phím tắt) và xử lý lệnh
  */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Content script trong cross-origin iframe có thể không đọc được chrome.storage
+  // trực tiếp, nên đọc storage tại service worker rồi trả kết quả qua message.
+  if (msg.action === 'getSettings') {
+    getSettings()
+      .then((settings) => sendResponse(settings))
+      .catch(() => sendResponse(null));
+    return true;
+  }
   if (msg.action !== 'keyCommand') return;
   handleCommand(msg.command, sender.tab).then(() => sendResponse({ ok: true }));
   return true;

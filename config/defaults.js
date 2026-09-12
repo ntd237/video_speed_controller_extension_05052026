@@ -18,6 +18,9 @@ const DEFAULTS = {
   overlayMinOpacity: 0.1,
   overlayMaxOpacity: 1.0,
 
+  // Thời gian tối đa chờ service worker phản hồi yêu cầu đọc cài đặt
+  settingsRequestTimeoutMs: 2000,
+
   // Step size options shown in UI
   stepSizeOptions: [0.25, 0.5, 1.0, 2.0],
 };
