@@ -16,10 +16,10 @@
 - [Sử dụng](#sử-dụng)
 - [Phím tắt](#phím-tắt)
 - [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Kiến trúc](#kiến-trúc)
 - [Cấu hình](#cấu-hình)
 - [License](#license)
 - [Liên hệ](#liên-hệ)
-
 
 ---
 
@@ -36,14 +36,15 @@
 Video Speed Controller cho phép:
 - Điều chỉnh tốc độ từ **0.1x đến 20x** trên mọi trang web có video HTML5
 - Nhấn **một phím duy nhất** để tăng/giảm tốc độ ngay lập tức
-- Hiển thị **overlay tốc độ** ngay trên góc video, có thể kéo thả đến vị trí tùy ý
+- Hiển thị **overlay tốc độ** ngay trên góc video và cho phép kéo thả trong lúc xem
 
 ### Công nghệ
 
 - Chrome Extension Manifest V3
 - Vanilla JavaScript (không có dependency bên ngoài)
-- Chrome Storage Sync API
-- Chrome Scripting & Tabs API
+- Chrome Storage Sync API làm nguồn dữ liệu chung
+- Chrome Tabs API và message passing giữa popup, service worker và content script
+- HTML/CSS thuần với design token, không dùng framework UI
 
 ---
 
@@ -53,8 +54,8 @@ Video Speed Controller cho phép:
 
 - **Điều chỉnh tốc độ**: Tăng/giảm theo bước tùy chỉnh (mặc định 0.5), hỗ trợ preset nhanh
 - **Overlay trên video**: Hiển thị tốc độ hiện tại ngay góc trên trái video, có thể kéo thả
-- **Phím tắt đơn**: D (tăng), S (giảm), R (reset 1x), F (áp dụng yêu thích), V (ẩn/hiện overlay)
-- **Tốc độ yêu thích**: Lưu và áp dụng tốc độ ưa thích nhanh (mặc định 3x)
+- **Phím tắt đơn**: D (tăng), S (giảm), R (reset về tốc độ mặc định), G (áp dụng yêu thích), V (ẩn/hiện overlay)
+- **Tốc độ yêu thích**: Lưu và áp dụng tốc độ ưa thích nhanh (mặc định 2x)
 - **Tự động áp dụng**: Áp dụng tốc độ đã lưu cho mọi video khi tải trang
 - **Blacklist / Whitelist**: Kiểm soát trang nào được bật extension
 
@@ -63,6 +64,8 @@ Video Speed Controller cho phép:
 - **Popup live update**: Slider và hiển thị tốc độ trong popup cập nhật ngay lập tức khi nhấn phím tắt
 - **Điều chỉnh độ trong suốt**: Slider điều chỉnh opacity của overlay ngay trong popup
 - **Preset bước nhảy**: Các nút preset nhanh (0.25 / 0.5 / 1.0 / 2.0) để chọn bước tăng giảm
+- **Giao diện sáng/tối**: Chọn Hệ thống, Sáng hoặc Tối; mặc định theo cài đặt hệ điều hành
+- **Trang cài đặt một chỗ**: Sidebar điều hướng theo nhóm, sửa cả danh sách trang trong một vùng soạn thảo, cảnh báo lỗi ngay tại ô nhập
 - **Phát hiện video tự động**: Tự phát hiện và áp dụng cả với video được thêm động (SPA)
 - **Kéo overlay không dừng video**: Di chuyển overlay mà video vẫn tiếp tục phát
 
@@ -70,11 +73,14 @@ Video Speed Controller cho phép:
 
 ## Cài đặt
 
+**Yêu cầu**: Chrome (hoặc trình duyệt nhân Chromium) phiên bản 105 trở lên, không cần Node.js hay bất kỳ dependency nào — extension chạy trực tiếp từ mã nguồn.
+
 ### Cài đặt ở chế độ Developer (Load unpacked)
 
-1. Clone hoặc tải về repository:
+1. Clone repository:
    ```bash
    git clone https://github.com/ntd237/video_speed_controller_extension_05052026.git
+   cd video_speed_controller_extension_05052026
    ```
 
 2. Mở Chrome và truy cập:
@@ -84,9 +90,15 @@ Video Speed Controller cho phép:
 
 3. Bật **Developer mode** (góc trên phải)
 
-4. Nhấn **Load unpacked** và chọn thư mục dự án
+4. Nhấn **Load unpacked** và chọn thư mục dự án (thư mục chứa `manifest.json`)
 
 5. Extension sẽ xuất hiện trong thanh công cụ Chrome
+
+6. Kiểm tra: mở một video bất kỳ, nhấn `D` — overlay góc trên trái video phải hiện tốc độ mới. Nếu chưa thấy, mở popup và xem tốc độ hiện tại có đổi không.
+
+### Cập nhật sau khi sửa mã nguồn
+
+Mở `chrome://extensions/` → nhấn nút **Reload** trên card của extension, sau đó tải lại trang đang mở.
 
 ---
 
@@ -125,20 +137,20 @@ Các phím tắt hoạt động khi **trang web đang có focus** (không phải
 |------|-----------|
 | `D` | Tăng tốc độ theo bước |
 | `S` | Giảm tốc độ theo bước |
-| `R` | Reset về 1x |
+| `R` | Reset về tốc độ mặc định |
 | `G` | Áp dụng tốc độ yêu thích |
 | `V` | Ẩn / hiện overlay tốc độ |
 
 > Các phím tắt cũng hoạt động **bên trong popup** khi popup đang mở.
 >
-> Để tùy chỉnh phím tắt ở cấp browser: `chrome://extensions/shortcuts`
+> Đây là phím do extension tự xử lý, không phải lệnh cấp browser, nên không cấu hình trong `chrome://extensions/shortcuts`.
 
 ---
 
 ## Cấu trúc dự án
 
 ```
-video_speed_controller_extension_extension_05052026/
+video_speed_controller_extension_05052026/
 ├── manifest.json           # Cấu hình extension (MV3)
 ├── config/
 │   ├── defaults.js         # Hằng số mặc định dùng chung
@@ -161,19 +173,19 @@ video_speed_controller_extension_extension_05052026/
 │   ├── options.html        # Trang cài đặt nâng cao
 │   ├── options.css         # Khung trang cài đặt
 │   └── options.js          # Logic trang cài đặt
-├── icons/
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-└── docs/
-    └── plan/               # Tài liệu kế hoạch phát triển
+├── docs/
+│   └── plan/               # Tài liệu kế hoạch phát triển
+└── icons/
+    ├── icon16.png
+    ├── icon48.png
+    └── icon128.png
 ```
 
 ### Mô tả các module chính
 
 | Module | Mô tả |
 |--------|-------|
-| `config/defaults.js` | DEFAULTS object chia sẻ cho tất cả scripts; mọi hằng số đều khai báo ở đây |
+| `config/defaults.js` | DEFAULTS, biên tốc độ và helper kiểm tra entry trang web; dùng chung cho content script, popup và options |
 | `config/ui.js` | Tham số riêng của giao diện, tách khỏi DEFAULTS để content script không phải tải |
 | `styles/tokens.css` | Token màu/khoảng cách/cỡ chữ cho cả hai theme |
 | `styles/components.css` | Button, chip, số, slider, switch, card, toast dùng chung |
@@ -183,6 +195,41 @@ video_speed_controller_extension_extension_05052026/
 | `background/service_worker.js` | Nhận lệnh từ content script, tính tốc độ mới, lưu storage, gửi lại content script |
 | `popup/popup.js` | Điều khiển UI popup; đồng bộ live với storage khi phím tắt thay đổi tốc độ |
 | `options/options.js` | Quản lý cài đặt nâng cao; blacklist/whitelist, tốc độ, hiển thị, giao diện |
+
+---
+
+## Kiến trúc
+
+```mermaid
+flowchart LR
+  subgraph page["Trang web"]
+    CS["content/content.js"]
+    VIDEO["video HTML5"]
+    OVERLAY["overlay tốc độ"]
+  end
+
+  SW["background/service_worker.js"]
+  POPUP["popup/popup.js"]
+  OPT["options/options.js"]
+  STORE[("chrome.storage.sync")]
+
+  CS --> VIDEO
+  CS --> OVERLAY
+  CS -- "keyCommand D/S/R/G/V" --> SW
+  POPUP -- "keyCommand" --> SW
+  SW -- "setSpeed" --> CS
+  POPUP -- "setSpeed / getStatus" --> CS
+  STORE -- "onChanged" --> CS
+  CS <--> STORE
+  SW <--> STORE
+  POPUP <--> STORE
+  OPT <--> STORE
+```
+
+- `chrome.storage.sync` là nguồn sự thật duy nhất; popup và trang cài đặt chỉ đọc/ghi storage, không giữ bản sao lâu dài.
+- Phím tắt trong trang hoặc trong popup gửi `keyCommand` cho service worker; service worker tính tốc độ mới, gửi `setSpeed` cho tab rồi ghi storage.
+- Content script áp tốc độ cho mọi video và cập nhật overlay, đồng thời lắng nghe `storage.onChanged` để phản ứng với thay đổi từ popup hoặc phím tắt.
+- Trong cross-origin iframe, content script đọc cài đặt qua message `getSettings` gửi service worker, với timeout `settingsRequestTimeoutMs`.
 
 ---
 
@@ -198,14 +245,33 @@ Tất cả giá trị mặc định được khai báo trong `config/defaults.js
 | `favoriteSpeed` | `2` | Tốc độ yêu thích (phím G) |
 | `autoApply` | `true` | Tự động áp dụng tốc độ khi tải trang |
 | `showOverlay` | `true` | Hiển thị overlay tốc độ trên video |
-| `overlayOpacity` | `0.7` | Độ trong suốt overlay (0.1 – 1.0) |
+| `overlayOpacity` | `0.7` | Độ trong suốt overlay |
 | `mode` | `'blacklist'` | Chế độ hoạt động: `'blacklist'` hoặc `'whitelist'` |
+| `blacklist` | `[]` | Danh sách trang bị chặn |
+| `whitelist` | `[]` | Danh sách trang được phép |
 | `theme` | `'system'` | Giao diện: `'system'`, `'light'` hoặc `'dark'` |
+| `themeOptions` | `['system', 'light', 'dark']` | Các lựa chọn giao diện hiển thị trong trang cài đặt |
 | `minSpeed` | `0.1` | Tốc độ tối thiểu |
 | `maxSpeed` | `20.0` | Tốc độ tối đa |
 | `minStepSize` | `0.01` | Bước nhảy tối thiểu |
 | `maxStepSize` | `20.0` | Bước nhảy tối đa |
+| `numberInputStep` | `0.01` | Bước nhảy của ô nhập số |
+| `speedSliderStep` | `0.05` | Bước của slider tốc độ |
+| `overlayMinOpacity` | `0.1` | Độ trong suốt tối thiểu |
+| `overlayMaxOpacity` | `1.0` | Độ trong suốt tối đa |
+| `opacitySliderStep` | `0.05` | Bước của slider độ trong suốt |
+| `settingsRequestTimeoutMs` | `2000` | Thời gian chờ service worker trả cài đặt trong iframe |
 | `stepSizeOptions` | `[0.25, 0.5, 1.0, 2.0]` | Các preset bước nhảy trong UI |
+
+Tham số riêng của giao diện nằm trong `config/ui.js`:
+
+| Tham số | Mặc định | Mô tả |
+|---------|---------|-------|
+| `themeCacheKey` | `'vsc-theme-choice'` | Khoá localStorage dùng để áp theme trước khi vẽ trang |
+| `toastSuccessMs` | `3000` | Thời gian hiển thị toast thành công |
+| `toastErrorMs` | `7000` | Thời gian hiển thị toast lỗi |
+| `listErrorPreviewLimit` | `6` | Số dòng lỗi tối đa hiển thị trong khối cảnh báo |
+| `scrollSpyProbePx` | `120` | Ngưỡng xác định mục đang xem cho sidebar |
 
 ---
 
