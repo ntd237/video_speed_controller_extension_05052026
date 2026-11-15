@@ -51,6 +51,14 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  function isExtensionContextValid() {
+    try {
+      return Boolean(chrome.runtime && chrome.runtime.id);
+    } catch (error) {
+      return false;
+    }
+  }
+
   function getSettings(callback) {
     let settled = false;
     const once = (settings) => {
@@ -58,17 +66,31 @@
       settled = true;
       callback({ ...DEFAULTS, ...settings });
     };
-    const fallback = () => chrome.storage.sync.get(DEFAULTS, once);
+    const fallback = () => {
+      try {
+        if (!isExtensionContextValid()) {
+          once(DEFAULTS);
+          return;
+        }
+        chrome.storage.sync.get(DEFAULTS, once);
+      } catch (error) {
+        once(DEFAULTS);
+      }
+    };
     let timer = null;
     try {
       timer = setTimeout(fallback, DEFAULTS.settingsRequestTimeoutMs);
       chrome.runtime.sendMessage({ action: 'getSettings' }, (settings) => {
         clearTimeout(timer);
-        if (chrome.runtime.lastError || !settings) {
-          fallback();
-          return;
+        try {
+          if (chrome.runtime.lastError || !settings) {
+            fallback();
+            return;
+          }
+          once(settings);
+        } catch (error) {
+          once(DEFAULTS);
         }
-        once(settings);
       });
     } catch (e) {
       clearTimeout(timer);
@@ -467,8 +489,12 @@
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const command = KEY_COMMAND_MAP[e.key.toLowerCase()];
       if (!command) return;
+      if (!isExtensionContextValid()) return;
       e.preventDefault();
-      chrome.runtime.sendMessage({ action: 'keyCommand', command });
+      try {
+        chrome.runtime.sendMessage({ action: 'keyCommand', command });
+      } catch (error) {
+      }
     });
   }
 
