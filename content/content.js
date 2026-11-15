@@ -1,31 +1,11 @@
 (function() {
   'use strict';
-
-  // ============================================================================
-  // Hằng số và trạng thái toàn cục
-  // ============================================================================
-
-  // WeakMap để lưu trữ tham chiếu overlay cho mỗi video
   const videoOverlayMap = new WeakMap();
-
-  // Set để theo dõi các video đã được xử lý
   const processedVideos = new WeakSet();
-
-  // Set để theo dõi các video đã có loadstart listener (tránh duplicate)
   const videosWithLoadstartListener = new WeakSet();
-
-  // WeakMap để quản lý ratechange listener hiện tại của mỗi video
   const rateChangeListenerMap = new WeakMap();
-
-  // Các video đã được xác định là không thể thay đổi playbackRate
   const speedLockedVideos = new WeakSet();
-
-  // MutationObserver để theo dõi video mới
   let mutationObserver = null;
-
-  // ============================================================================
-  // Hàm tiện ích
-  // ============================================================================
 
   function collectVideos(root) {
     const videos = [];
@@ -38,17 +18,9 @@
     return videos;
   }
 
-  /**
-   * Kiểm tra xem miền hiện tại có được phép hay không dựa trên cài đặt
-   * @param {Object} settings - Cài đặt từ storage
-   * @returns {boolean} true nếu miền được phép
-   */
   function isDomainAllowed(settings) {
     let hostname, port;
     try {
-      // Ở frame cross-origin, window.top.location trả về được object nhưng
-      // đọc hostname/port/protocol trên nó bị chặn (SecurityError) nên toàn
-      // bộ việc đọc phải nằm trong try; khi đó dùng hostname của chính frame.
       hostname = window.top.location.hostname;
       port = window.top.location.port || (window.top.location.protocol === 'https:' ? '443' : '80');
     } catch (e) {
@@ -62,11 +34,6 @@
     }
   }
 
-  /**
-   * Giới hạn tốc độ trong khoảng cho phép
-   * @param {number} speed - Tốc độ cần giới hạn
-   * @returns {number} Tốc độ đã giới hạn
-   */
   function clampSpeed(speed) {
     return Math.min(DEFAULTS.maxSpeed, Math.max(DEFAULTS.minSpeed, speed));
   }
@@ -84,12 +51,6 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Đọc cài đặt qua service worker.
-   * Trong cross-origin iframe, callback của chrome.storage.sync.get có thể
-   * không bao giờ được gọi, nên message channel (vẫn hoạt động ở mọi frame)
-   * là đường đọc cài đặt đáng tin cậy; storage.get chỉ là fallback.
-   */
   function getSettings(callback) {
     let settled = false;
     const once = (settings) => {
@@ -222,10 +183,6 @@
     video.addEventListener('loadstart', handleLoadstart);
   }
 
-  /**
-   * Lấy tốc độ phát lại hiện tại từ video đầu tiên (nếu có)
-   * @returns {number} Tốc độ phát lại hiện tại
-   */
   function getCurrentSpeed() {
     const videos = collectVideos(document.documentElement);
     if (videos.length > 0) {
@@ -234,17 +191,6 @@
     return DEFAULTS.currentSpeed;
   }
 
-  // ============================================================================
-  // Quản lý overlay
-  // ============================================================================
-
-  /**
-   * Tạo overlay badge cho video
-   * @param {HTMLVideoElement} video - Phần tử video
-   * @param {number} speed - Tốc độ hiển thị
-   * @param {Object} settings - Cài đặt từ storage
-   * @returns {HTMLElement} Phần tử overlay
-   */
   function createOverlay(video, speed, settings) {
     const overlay = document.createElement('div');
     overlay.className = 'video-speed-overlay';
@@ -267,17 +213,11 @@
       display: ${settings.showOverlay ? 'block' : 'none'};
     `;
 
-    // Thêm sự kiện kéo
     addDragListener(overlay, video);
 
     return overlay;
   }
 
-  /**
-   * Thêm sự kiện kéo cho overlay
-   * @param {HTMLElement} overlay - Phần tử overlay
-   * @param {HTMLVideoElement} video - Phần tử video
-   */
   function addDragListener(overlay, video) {
     let isDragging = false;
     let startX = 0;
@@ -311,20 +251,12 @@
     });
   }
 
-  /**
-   * Cập nhật overlay cho video
-   * @param {HTMLVideoElement} video - Phần tử video
-   * @param {number} speed - Tốc độ mới
-   * @param {Object} settings - Cài đặt từ storage
-   */
   function updateOverlay(video, speed, settings) {
     let overlay = videoOverlayMap.get(video);
 
-    // Tạo overlay mới nếu chưa tồn tại hoặc bị xóa khỏi DOM
     if (!overlay || !overlay.isConnected) {
       overlay = createOverlay(video, speed, settings);
 
-      // Đảm bảo parent container có position relative để overlay absolute hoạt động
       const parent = video.parentElement;
       if (parent) {
         const parentPos = getComputedStyle(parent).position;
@@ -339,20 +271,11 @@
       videoOverlayMap.set(video, overlay);
     }
 
-    // Cập nhật nội dung
     overlay.textContent = speed.toFixed(1);
-
-    // Cập nhật opacity
     overlay.style.opacity = clampSpeed(settings.overlayOpacity);
-
-    // Cập nhật hiển thị
     overlay.style.display = settings.showOverlay ? 'block' : 'none';
   }
 
-  /**
-   * Cập nhật tất cả overlay
-   * @param {Object} settings - Cài đặt từ storage
-   */
   function updateAllOverlays(settings) {
     const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
@@ -361,16 +284,6 @@
     });
   }
 
-  // ============================================================================
-  // Áp dụng tốc độ
-  // ============================================================================
-
-  /**
-   * Áp dụng tốc độ cho một video
-   * @param {HTMLVideoElement} video - Phần tử video
-   * @param {number} speed - Tốc độ cần áp dụng
-   * @param {Object} settings - Cài đặt từ storage
-   */
   async function applySpeedToVideo(video, speed, settings) {
     try {
       const clampedSpeed = clampSpeed(speed);
@@ -402,10 +315,8 @@
         speedLockedVideos.add(video);
       }
 
-      // Overlay luôn phản ánh playbackRate thực tế của video.
       updateOverlay(video, isApplied ? clampedSpeed : actualSpeed, settings);
 
-      // Đánh dấu video đã được xử lý
       processedVideos.add(video);
 
       if (canControlSpeed) {
@@ -429,11 +340,6 @@
     }
   }
 
-  /**
-   * Áp dụng tốc độ cho tất cả video
-   * @param {number} speed - Tốc độ cần áp dụng
-   * @param {Object} settings - Cài đặt từ storage
-   */
   async function applySpeedToAllVideos(speed, settings) {
     const videos = collectVideos(document.documentElement);
     if (videos.length === 0) {
@@ -453,15 +359,6 @@
     };
   }
 
-  // ============================================================================
-  // Phát hiện video
-  // ============================================================================
-
-  /**
-   * Xử lý video mới được phát hiện
-   * @param {HTMLVideoElement} video - Phần tử video
-   * @param {Object} settings - Cài đặt từ storage
-   */
   function handleNewVideo(video, settings) {
     if (processedVideos.has(video)) {
       return;
@@ -470,16 +367,11 @@
     if (settings.autoApply) {
       void applySpeedToVideo(video, settings.currentSpeed, settings);
     } else {
-      // Vẫn tạo overlay nhưng không áp dụng tốc độ
       updateOverlay(video, getVideoPlaybackRate(video), settings);
       processedVideos.add(video);
     }
   }
 
-  /**
-   * Quét tất cả video hiện tại trên trang
-   * @param {Object} settings - Cài đặt từ storage
-   */
   function scanForVideos(settings) {
     const videos = collectVideos(document.documentElement);
     videos.forEach(video => {
@@ -487,9 +379,6 @@
     });
   }
 
-  /**
-   * Khởi tạo MutationObserver để theo dõi video mới
-   */
   function initMutationObserver() {
     if (mutationObserver) {
       mutationObserver.disconnect();
@@ -510,7 +399,6 @@
 
       if (newVideos.length === 0) return;
 
-      // Lấy settings mới nhất từ storage để tránh dùng closure cũ
       getSettings((settings) => {
         newVideos.forEach(video => {
           handleNewVideo(video, settings);
@@ -524,13 +412,6 @@
     });
   }
 
-  // ============================================================================
-  // Lắng nghe tin nhắn
-  // ============================================================================
-
-  /**
-   * Lắng nghe tin nhắn từ popup/service_worker
-   */
   function initMessageListener() {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
@@ -545,7 +426,7 @@
                 sendResponse({ ok: false, error: error.message });
               });
           });
-          return true; // Giữ channel mở cho sendResponse không đồng bộ
+          return true; 
         }
 
         if (msg.action === 'getStatus') {
@@ -572,10 +453,6 @@
     });
   }
 
-  // ============================================================================
-  // Phím tắt bàn phím
-  // ============================================================================
-
   const KEY_COMMAND_MAP = {
     'd': 'speed-up',
     's': 'speed-down',
@@ -584,10 +461,6 @@
     'v': 'toggle-overlay',
   };
 
-  /**
-   * Khởi tạo listener phím tắt đơn
-   * Chỉ kích hoạt khi không có input/textarea đang được focus
-   */
   function initKeyListener() {
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
@@ -599,71 +472,42 @@
     });
   }
 
-  // ============================================================================
-  // Lắng nghe thay đổi storage
-  // ============================================================================
-
-  /**
-   * Lắng nghe thay đổi storage
-   */
   function initStorageListener() {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'sync') return;
 
       getSettings((settings) => {
-        // Cập nhật overlay nếu showOverlay hoặc overlayOpacity thay đổi
         if (changes.showOverlay || changes.overlayOpacity) {
           updateAllOverlays(settings);
         }
 
-        // Áp dụng tốc độ mới nếu currentSpeed thay đổi
         if (changes.currentSpeed) {
           void applySpeedToAllVideos(changes.currentSpeed.newValue, settings);
         }
 
-        // Nếu autoApply thay đổi, có thể cần xử lý lại
         if (changes.autoApply) {
-          // Không cần hành động cụ thể, chỉ cập nhật cài đặt
         }
       });
     });
   }
 
-  // ============================================================================
-  // Khởi tạo
-  // ============================================================================
-
-  /**
-   * Khởi tạo content script
-   */
   function init() {
     getSettings((settings) => {
-      // Kiểm tra xem miền có được phép không
       if (!isDomainAllowed(settings)) {
         console.log('Miền này không được phép sử dụng Video Speed Controller');
         return;
       }
 
-      // Quét video hiện tại
       scanForVideos(settings);
-
-      // Khởi tạo MutationObserver
       initMutationObserver();
-
-      // Khởi tạo lắng nghe tin nhắn
       initMessageListener();
-
-      // Khởi tạo lắng nghe storage
       initStorageListener();
-
-      // Khởi tạo phím tắt bàn phím
       initKeyListener();
 
       console.log('Video Speed Controller đã được khởi tạo');
     });
   }
 
-  // Khởi tạo khi DOM sẵn sàng
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

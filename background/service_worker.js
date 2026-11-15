@@ -1,13 +1,6 @@
-// Service worker: keyboard commands
-// Tải DEFAULTS từ config/defaults.js
 importScripts('../config/defaults.js');
 
-/**
- * Lắng nghe tin nhắn từ content script (phím tắt) và xử lý lệnh
- */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // Content script trong cross-origin iframe có thể không đọc được chrome.storage
-  // trực tiếp, nên đọc storage tại service worker rồi trả kết quả qua message.
   if (msg.action === 'getSettings') {
     getSettings()
       .then((settings) => sendResponse(settings))
@@ -19,11 +12,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-/**
- * Xử lý lệnh tốc độ / overlay
- * @param {string} command - Tên lệnh: speed-up|speed-down|speed-reset|speed-favorite|toggle-overlay
- * @param {Object} tab - Tab nguồn từ sender
- */
 async function handleCommand(command, tab) {
   try {
     const settings = await getSettings();
@@ -51,7 +39,6 @@ async function handleCommand(command, tab) {
       return;
     }
 
-    // Làm tròn tốc độ đến 2 chữ số thập phân để tránh lỗi floating point
     newSpeed = Math.round(newSpeed * 100) / 100;
 
     if (tab) {
@@ -71,10 +58,6 @@ async function handleCommand(command, tab) {
   }
 }
 
-/**
- * Đọc cài đặt từ chrome.storage.sync
- * @returns {Promise<Object>} Đối tượng cài đặt
- */
 async function getSettings() {
   const data = await chrome.storage.sync.get(null);
   return { ...DEFAULTS, ...data };
