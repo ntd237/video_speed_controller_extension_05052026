@@ -13,7 +13,6 @@
 - [Giới thiệu](#giới-thiệu)
 - [Tính năng](#tính-năng)
 - [Cài đặt](#cài-đặt)
-- [Sử dụng](#sử-dụng)
 - [Phím tắt](#phím-tắt)
 - [Kiến trúc](#kiến-trúc)
 - [License](#license)
@@ -36,14 +35,6 @@ Video Speed Controller cho phép:
 - Nhấn **một phím duy nhất** để tăng/giảm tốc độ ngay lập tức
 - Hiển thị **overlay tốc độ** ngay trên góc video và cho phép kéo thả trong lúc xem
 
-### Công nghệ
-
-- Chrome Extension Manifest V3
-- Vanilla JavaScript (không có dependency bên ngoài)
-- Chrome Storage Sync API làm nguồn dữ liệu chung
-- Chrome Tabs API và message passing giữa popup, service worker và content script
-- HTML/CSS thuần với design token, không dùng framework UI
-
 ---
 
 ## Tính năng
@@ -54,16 +45,13 @@ Video Speed Controller cho phép:
 - **Overlay trên video**: Hiển thị tốc độ hiện tại ngay góc trên trái video, có thể kéo thả
 - **Phím tắt đơn**: D (tăng), S (giảm), R (reset về tốc độ mặc định), G (áp dụng yêu thích), V (ẩn/hiện overlay)
 - **Tốc độ yêu thích**: Lưu và áp dụng tốc độ ưa thích nhanh (mặc định 2x)
-- **Tự động áp dụng**: Áp dụng tốc độ đã lưu cho mọi video khi tải trang
 - **Blacklist / Whitelist**: Kiểm soát trang nào được bật extension
 
 ### Tính năng nâng cao
 
-- **Popup live update**: Slider và hiển thị tốc độ trong popup cập nhật ngay lập tức khi nhấn phím tắt
 - **Điều chỉnh độ trong suốt**: Slider điều chỉnh opacity của overlay ngay trong popup
 - **Preset bước nhảy**: Các nút preset nhanh (0.25 / 0.5 / 1.0 / 2.0) để chọn bước tăng giảm
 - **Giao diện sáng/tối**: Chọn Hệ thống, Sáng hoặc Tối; mặc định theo cài đặt hệ điều hành
-- **Trang cài đặt một chỗ**: Sidebar điều hướng theo nhóm, sửa cả danh sách trang trong một vùng soạn thảo, cảnh báo lỗi ngay tại ô nhập
 - **Phát hiện video tự động**: Tự phát hiện và áp dụng cả với video được thêm động (SPA)
 - **Kéo overlay không dừng video**: Di chuyển overlay mà video vẫn tiếp tục phát
 
@@ -100,33 +88,6 @@ Mở `chrome://extensions/` → nhấn nút **Reload** trên card của extensio
 
 ---
 
-## Sử dụng
-
-### Popup UI
-
-Nhấn vào icon extension trong thanh công cụ để mở popup:
-
-- **Thanh trượt tốc độ**: Kéo để thay đổi tốc độ (0.1 – 20x)
-- **Nút − / 1x / +**: Giảm / reset / tăng tốc độ theo bước đã chọn
-- **Preset bước nhảy**: Chọn nhanh bước nhảy 0.25, 0.5, 1.0, hoặc 2.0
-- **Tốc độ yêu thích**: Nhập tốc độ ưa thích → nhấn **Lưu** để ghi nhớ
-- **Độ trong suốt**: Kéo slider để điều chỉnh độ trong suốt của overlay
-- **Toggle trang**: Bật/tắt extension cho domain hiện tại
-- **Nút Mở cài đặt**: Mở trang Options để cấu hình nâng cao
-
-### Trang Options
-
-Truy cập tại `chrome://extensions/` → nhấn **Details** → **Extension options**, hoặc nhấn nút **Mở cài đặt** trong popup. Trang có sidebar điều hướng theo nhóm cài đặt và thanh lưu cố định ở đầu trang:
-
-- **Chế độ và trang web**: chọn **Danh sách chặn** hoặc **Danh sách cho phép**, sửa toàn bộ danh sách trong một vùng soạn thảo (mỗi dòng một trang), lỗi nhập liệu hiển thị ngay dưới danh sách
-- **Tốc độ**: bước nhảy (kèm preset), tốc độ mặc định, tốc độ yêu thích
-- **Hiển thị**: bật/tắt overlay, độ trong suốt, giao diện **Hệ thống / Sáng / Tối**, tự động áp dụng tốc độ
-- **Phím tắt**: danh sách phím tắt đang dùng
-
-Thay đổi chưa lưu được báo bằng chấm trạng thái ở thanh trên; nhấn **Lưu cài đặt** (hoặc `Ctrl/Cmd + S`) để ghi vào `chrome.storage.sync`.
-
----
-
 ## Phím tắt
 
 Các phím tắt hoạt động khi **trang web đang có focus** (không phải khi đang gõ vào ô input):
@@ -138,10 +99,6 @@ Các phím tắt hoạt động khi **trang web đang có focus** (không phải
 | `R` | Reset về tốc độ mặc định |
 | `G` | Áp dụng tốc độ yêu thích |
 | `V` | Ẩn / hiện overlay tốc độ |
-
-> Các phím tắt cũng hoạt động **bên trong popup** khi popup đang mở.
->
-> Đây là phím do extension tự xử lý, không phải lệnh cấp browser, nên không cấu hình trong `chrome://extensions/shortcuts`.
 
 ---
 
@@ -172,11 +129,6 @@ flowchart LR
   POPUP <--> STORE
   OPT <--> STORE
 ```
-
-- `chrome.storage.sync` là nguồn sự thật duy nhất; popup và trang cài đặt chỉ đọc/ghi storage, không giữ bản sao lâu dài.
-- Phím tắt trong trang hoặc trong popup gửi `keyCommand` cho service worker; service worker tính tốc độ mới, gửi `setSpeed` cho tab rồi ghi storage.
-- Content script áp tốc độ cho mọi video và cập nhật overlay, đồng thời lắng nghe `storage.onChanged` để phản ứng với thay đổi từ popup hoặc phím tắt.
-- Trong cross-origin iframe, content script đọc cài đặt qua message `getSettings` gửi service worker, với timeout `settingsRequestTimeoutMs`.
 
 ---
 
