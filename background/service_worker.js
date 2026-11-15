@@ -43,10 +43,7 @@ async function handleCommand(command, tab) {
 
     if (tab) {
       try {
-        const response = await chrome.tabs.sendMessage(tab.id, { action: 'setSpeed', speed: newSpeed });
-        if (response?.canControlSpeed === false) {
-          return;
-        }
+        await chrome.tabs.sendMessage(tab.id, { action: 'setSpeed', speed: newSpeed });
       } catch (error) {
         console.debug('Không thể gửi tin nhắn đến tab:', error.message);
       }

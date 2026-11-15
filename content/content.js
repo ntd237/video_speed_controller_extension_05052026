@@ -108,8 +108,13 @@
     return isStreamSource || isInfiniteDuration;
   }
 
+  function getRawPlaybackRate(video) {
+    const rate = Number(video.playbackRate);
+    return Number.isFinite(rate) ? rate : DEFAULTS.currentSpeed;
+  }
+
   function isPlaybackRateLocked(video, targetSpeed = getVideoPlaybackRate(video)) {
-    const actualSpeed = getVideoPlaybackRate(video);
+    const actualSpeed = getRawPlaybackRate(video);
 
     return (
       speedLockedVideos.has(video) ||
@@ -140,14 +145,15 @@
     rateChangeListenerMap.delete(video);
   }
 
-  function attachRateChangeListener(video, targetSpeed, settings) {
+  function attachRateChangeListener(video, targetSpeed, settings, options) {
+    const force = Boolean(options && options.force);
     removeRateChangeListener(video);
 
     let retryCount = 0;
-    const maxRetries = 10;
+    const maxRetries = DEFAULTS.speedApplyRetries;
 
     const handleRateChange = async () => {
-      const actualSpeed = getVideoPlaybackRate(video);
+      const actualSpeed = getRawPlaybackRate(video);
 
       if (Math.abs(actualSpeed - targetSpeed) <= 0.01) {
         speedLockedVideos.delete(video);
@@ -156,7 +162,7 @@
       }
 
       retryCount++;
-      if (retryCount > maxRetries || isPlaybackRateLocked(video, targetSpeed)) {
+      if (retryCount > maxRetries || (!force && isPlaybackRateLocked(video, targetSpeed))) {
         speedLockedVideos.add(video);
         removeRateChangeListener(video);
         updateOverlay(video, getVideoPlaybackRate(video), settings);
@@ -164,8 +170,8 @@
       }
 
       video.playbackRate = targetSpeed;
-      await wait(120);
-      updateOverlay(video, getVideoPlaybackRate(video), settings);
+      await wait(DEFAULTS.speedApplyRetryDelayMs);
+      updateOverlay(video, getRawPlaybackRate(video), settings);
     };
 
     rateChangeListenerMap.set(video, handleRateChange);
@@ -306,12 +312,17 @@
     });
   }
 
-  async function applySpeedToVideo(video, speed, settings) {
+  async function applySpeedToVideo(video, speed, settings, options) {
+    const force = Boolean(options && options.force);
     try {
       const clampedSpeed = clampSpeed(speed);
       removeRateChangeListener(video);
 
-      if (isKnownUncontrollableVideo(video)) {
+      if (force) {
+        speedLockedVideos.delete(video);
+      }
+
+      if (!force && isKnownUncontrollableVideo(video)) {
         speedLockedVideos.add(video);
         video.playbackRate = DEFAULTS.currentSpeed;
         updateOverlay(video, DEFAULTS.currentSpeed, settings);
@@ -325,11 +336,19 @@
       }
 
       video.playbackRate = clampedSpeed;
-      await wait(120);
-
-      const actualSpeed = getVideoPlaybackRate(video);
-      const isApplied = Math.abs(actualSpeed - clampedSpeed) <= 0.01;
-      const canControlSpeed = isApplied || !isPlaybackRateLocked(video, clampedSpeed);
+      let actualSpeed = getRawPlaybackRate(video);
+      let isApplied = Math.abs(actualSpeed - clampedSpeed) <= 0.01;
+      let attempts = 0;
+      while (!isApplied && attempts < DEFAULTS.speedApplyRetries) {
+        await wait(DEFAULTS.speedApplyRetryDelayMs);
+        attempts++;
+        actualSpeed = getRawPlaybackRate(video);
+        isApplied = Math.abs(actualSpeed - clampedSpeed) <= 0.01;
+        if (!isApplied) {
+          video.playbackRate = clampedSpeed;
+        }
+      }
+      const canControlSpeed = isApplied || (!isPlaybackRateLocked(video, clampedSpeed) || force);
 
       if (canControlSpeed) {
         speedLockedVideos.delete(video);
@@ -341,8 +360,8 @@
 
       processedVideos.add(video);
 
-      if (canControlSpeed) {
-        attachRateChangeListener(video, clampedSpeed, settings);
+      if (canControlSpeed && !(force && isKnownUncontrollableVideo(video))) {
+        attachRateChangeListener(video, clampedSpeed, settings, { force });
       }
 
       ensureLoadstartListener(video);
@@ -362,7 +381,7 @@
     }
   }
 
-  async function applySpeedToAllVideos(speed, settings) {
+  async function applySpeedToAllVideos(speed, settings, options) {
     const videos = collectVideos(document.documentElement);
     if (videos.length === 0) {
       return {
@@ -372,7 +391,7 @@
       };
     }
 
-    const results = await Promise.all(videos.map(video => applySpeedToVideo(video, speed, settings)));
+    const results = await Promise.all(videos.map(video => applySpeedToVideo(video, speed, settings, options)));
 
     return {
       applied: results.some(result => result.applied),
@@ -439,7 +458,7 @@
       try {
         if (msg.action === 'setSpeed') {
           getSettings((settings) => {
-            void applySpeedToAllVideos(msg.speed, settings)
+            void applySpeedToAllVideos(msg.speed, settings, { force: true })
               .then((result) => {
                 sendResponse({ ok: true, ...result });
               })
@@ -505,10 +524,6 @@
       getSettings((settings) => {
         if (changes.showOverlay || changes.overlayOpacity) {
           updateAllOverlays(settings);
-        }
-
-        if (changes.currentSpeed) {
-          void applySpeedToAllVideos(changes.currentSpeed.newValue, settings);
         }
 
         if (changes.autoApply) {

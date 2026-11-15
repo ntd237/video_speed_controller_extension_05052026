@@ -21,6 +21,10 @@ const DEFAULTS = {
   numberInputStep: 0.01,
   speedSliderStep: 0.05,
 
+  // Số lần thử đặt lại tốc độ khi player chủ động ghi đè playbackRate
+  speedApplyRetries: 10,
+  speedApplyRetryDelayMs: 120,
+
   // Overlay
   overlayMinOpacity: 0.1,
   overlayMaxOpacity: 1.0,
