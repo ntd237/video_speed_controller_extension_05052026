@@ -1,375 +1,401 @@
-// Popup logic
+(function () {
+  "use strict";
 
-// DOM Elements
-const speedDisplay = document.getElementById('speedDisplay');
-const speedSlider = document.getElementById('speedSlider');
-const decreaseBtn = document.getElementById('decreaseBtn');
-const resetBtn = document.getElementById('resetBtn');
-const increaseBtn = document.getElementById('increaseBtn');
-const stepSizeInput = document.getElementById('stepSizeInput');
-const stepPresetsContainer = document.getElementById('stepPresets');
-const favoriteSpeedInput = document.getElementById('favoriteSpeedInput');
-const saveFavoriteBtn = document.getElementById('saveFavoriteBtn');
-const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
-const overlayOpacityValue = document.getElementById('overlayOpacityValue');
-const siteToggle = document.getElementById('siteToggle');
-const siteToggleLabel = document.getElementById('siteToggleLabel');
-const settingsBtn = document.getElementById('settingsBtn');
+  var POPUP_KEY_MAP = {
+    d: "speed-up",
+    s: "speed-down",
+    r: "speed-reset",
+    g: "speed-favorite",
+    v: "toggle-overlay"
+  };
 
-// State
-let currentSpeed = DEFAULTS.currentSpeed;
-let stepSize = DEFAULTS.stepSize;
-let favoriteSpeed = DEFAULTS.favoriteSpeed;
-let overlayOpacity = DEFAULTS.overlayOpacity;
-let currentDomain = '';
-let currentPagePort = '';
-let isBlacklistMode = DEFAULTS.mode === 'blacklist';
-let blacklist = [];
-let whitelist = [];
-let canControlCurrentTab = true;
+  var state = {
+    currentSpeed: DEFAULTS.currentSpeed,
+    defaultSpeed: DEFAULTS.defaultSpeed,
+    stepSize: DEFAULTS.stepSize,
+    favoriteSpeed: DEFAULTS.favoriteSpeed,
+    overlayOpacity: DEFAULTS.overlayOpacity,
+    mode: DEFAULTS.mode,
+    blacklist: [],
+    whitelist: [],
+    currentDomain: "",
+    currentPagePort: "",
+    canControlCurrentTab: true
+  };
 
-// Initialize popup
-async function initPopup() {
-  try {
-    // Load settings from storage
-    const settings = await chrome.storage.sync.get(null);
+  function $(id) {
+    return document.getElementById(id);
+  }
 
-    currentSpeed = settings.currentSpeed ?? DEFAULTS.currentSpeed;
-    stepSize = settings.stepSize ?? DEFAULTS.stepSize;
-    favoriteSpeed = settings.favoriteSpeed ?? DEFAULTS.favoriteSpeed;
-    overlayOpacity = settings.overlayOpacity ?? DEFAULTS.overlayOpacity;
-    isBlacklistMode = (settings.mode ?? DEFAULTS.mode) === 'blacklist';
-    blacklist = settings.blacklist ?? DEFAULTS.blacklist;
-    whitelist = settings.whitelist ?? DEFAULTS.whitelist;
+  function clampSpeed(value) {
+    return VSCUI.round2(VSCUI.clamp(value, DEFAULTS.minSpeed, DEFAULTS.maxSpeed));
+  }
 
-    // Get current tab URL and extract domain
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs.length > 0) {
-      const url = new URL(tabs[0].url);
-      currentDomain = url.hostname;
-      currentPagePort = url.port || (url.protocol === 'https:' ? '443' : '80');
+  function clampStepSize(value) {
+    return VSCUI.round2(VSCUI.clamp(value, DEFAULTS.minStepSize, DEFAULTS.maxStepSize));
+  }
+
+  function setRange(input, min, max, step) {
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+  }
+
+  function applyBounds() {
+    setRange($("speedSlider"), DEFAULTS.minSpeed, DEFAULTS.maxSpeed, DEFAULTS.numberInputStep);
+    setRange($("stepSizeInput"), DEFAULTS.minStepSize, DEFAULTS.maxStepSize, DEFAULTS.numberInputStep);
+    setRange($("favoriteSpeedInput"), DEFAULTS.minSpeed, DEFAULTS.maxSpeed, DEFAULTS.numberInputStep);
+    setRange($("overlayOpacitySlider"), DEFAULTS.overlayMinOpacity, DEFAULTS.overlayMaxOpacity, DEFAULTS.opacitySliderStep);
+  }
+
+  function persistSettings(payload, errorMessage) {
+    return chrome.storage.sync.set(payload).catch(function () {
+      VSCUI.toast($("toastRegion"), errorMessage, "error");
+    });
+  }
+
+  function isSiteEnabled() {
+    if (!state.currentDomain) {
+      return state.canControlCurrentTab;
     }
+    if (state.mode === "blacklist") {
+      return !state.blacklist.some(function (entry) {
+        return matchesSiteEntry(entry, state.currentDomain, state.currentPagePort);
+      });
+    }
+    return state.whitelist.some(function (entry) {
+      return matchesSiteEntry(entry, state.currentDomain, state.currentPagePort);
+    });
+  }
 
-    // Render UI
-    renderUI();
-    attachEventListeners();
+  function renderSiteState() {
+    var enabled = isSiteEnabled();
+    $("siteState").dataset.enabled = String(enabled);
+    $("siteDot").dataset.state = enabled ? "saved" : "dirty";
+    $("siteStateText").textContent = enabled ? "Đang bật" : "Đang tắt";
+    $("siteToggle").checked = enabled;
+    $("siteToggleLabel").textContent = state.currentDomain
+      ? (enabled ? "Bật trên " : "Tắt trên ") + state.currentDomain
+      : "Bật trên trang này";
+    renderControlsState();
+  }
 
-    // Query content script for current speed
+  function renderSpeed() {
+    var value = VSCUI.formatSpeed(state.currentSpeed);
+    $("speedDisplay").textContent = value;
+    $("speedSlider").value = String(state.currentSpeed);
+    $("speedSlider").setAttribute("aria-valuetext", value + "x");
+    VSCUI.syncFill($("speedSlider"));
+  }
+
+  function renderControlsState() {
+    var disabled = !state.canControlCurrentTab;
+    ["speedSlider", "decreaseBtn", "resetBtn", "increaseBtn"].forEach(function (id) {
+      $(id).disabled = disabled;
+    });
+    $("speedDisplay").dataset.muted = String(disabled || !isSiteEnabled());
+  }
+
+  function renderStepPresets() {
+    var container = $("stepPresets");
+    container.innerHTML = "";
+
+    (DEFAULTS.stepSizeOptions || []).forEach(function (option) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip";
+      btn.textContent = option.toFixed(2);
+      btn.setAttribute("aria-pressed", String(Math.abs(option - state.stepSize) < 0.001));
+      btn.addEventListener("click", function () {
+        selectStepPreset(option);
+      });
+      container.appendChild(btn);
+    });
+  }
+
+  async function selectStepPreset(value) {
+    state.stepSize = value;
+    $("stepSizeInput").value = value.toFixed(2);
+    renderStepPresets();
+    await persistSettings({ stepSize: value }, "Chưa lưu được bước nhảy");
+  }
+
+  async function setSpeed(value) {
+    var speed = clampSpeed(value);
+    var display = speed;
+    var shouldPersist = true;
+
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs.length > 0) {
       try {
-        const response = await chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' });
+        var response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: "setSpeed",
+          speed: speed
+        });
         if (response && response.currentSpeed !== undefined) {
-          currentSpeed = response.currentSpeed;
-          canControlCurrentTab = response.canControlSpeed !== false;
-          updateSpeedDisplay();
-          updateSpeedControlsState();
+          display = response.currentSpeed;
+        }
+        if (response && response.canControlSpeed === false) {
+          state.canControlCurrentTab = false;
+          shouldPersist = false;
+        } else {
+          state.canControlCurrentTab = true;
         }
       } catch (err) {
-        // Content script not available on this tab
+        state.canControlCurrentTab = true;
       }
     }
-  } catch (err) {
-    console.error('Error initializing popup:', err);
-  }
-}
 
-// Render UI elements
-function renderUI() {
-  // Update speed display and slider
-  updateSpeedDisplay();
-  updateSpeedControlsState();
+    state.currentSpeed = display;
+    renderSpeed();
+    renderControlsState();
 
-  // Render step size presets
-  renderStepPresets();
-
-  // Update step size input
-  stepSizeInput.value = stepSize.toFixed(2);
-
-  // Update favorite speed input
-  if (favoriteSpeed !== null) {
-    favoriteSpeedInput.value = favoriteSpeed.toFixed(2);
-  } else {
-    favoriteSpeedInput.value = '';
-  }
-
-  // Update overlay opacity slider
-  overlayOpacitySlider.value = overlayOpacity;
-  overlayOpacityValue.textContent = overlayOpacity.toFixed(2);
-
-  // Update site toggle
-  const isEnabled = isSiteEnabled();
-  siteToggle.checked = isEnabled;
-  updateSiteToggleLabel();
-}
-
-// Render step size preset buttons
-function renderStepPresets() {
-  stepPresetsContainer.innerHTML = '';
-  DEFAULTS.stepSizeOptions.forEach(option => {
-    const btn = document.createElement('button');
-    btn.className = 'btn-preset' + (option === stepSize ? ' active' : '');
-    btn.textContent = option % 1 === 0 ? option + '' : option + '';
-    btn.title = option;
-    btn.addEventListener('click', () => selectStepPreset(option));
-    stepPresetsContainer.appendChild(btn);
-  });
-}
-
-// Select a step size preset
-async function selectStepPreset(value) {
-  stepSize = value;
-  stepSizeInput.value = value.toFixed(2);
-  renderStepPresets();
-  await chrome.storage.sync.set({ stepSize });
-}
-
-// Update speed display and slider
-function updateSpeedDisplay() {
-  const displaySpeed = currentSpeed.toFixed(2);
-  speedDisplay.textContent = displaySpeed + 'x';
-  speedSlider.value = currentSpeed.toString();
-}
-
-function updateSpeedControlsState() {
-  speedSlider.disabled = !canControlCurrentTab;
-  decreaseBtn.disabled = !canControlCurrentTab;
-  resetBtn.disabled = !canControlCurrentTab;
-  increaseBtn.disabled = !canControlCurrentTab;
-}
-
-// Update site toggle label
-function updateSiteToggleLabel() {
-  if (currentDomain) {
-    siteToggleLabel.textContent = `Bật trên ${currentDomain}`;
-  } else {
-    siteToggleLabel.textContent = 'Bật trên trang này';
-  }
-}
-
-// Check if site is enabled
-function isSiteEnabled() {
-  if (isBlacklistMode) {
-    // In blacklist mode, enabled if NOT in blacklist
-    return !blacklist.some((d) => matchesSiteEntry(d, currentDomain, currentPagePort));
-  } else {
-    // In whitelist mode, enabled if in whitelist
-    return whitelist.some((d) => matchesSiteEntry(d, currentDomain, currentPagePort));
-  }
-}
-
-// Attach event listeners
-function attachEventListeners() {
-  // Speed slider
-  speedSlider.addEventListener('input', handleSpeedChange);
-
-  // Speed buttons
-  decreaseBtn.addEventListener('click', () => changeSpeed(-stepSize));
-  resetBtn.addEventListener('click', () => changeSpeed(DEFAULTS.defaultSpeed - currentSpeed));
-  increaseBtn.addEventListener('click', () => changeSpeed(stepSize));
-
-  // Step size input
-  stepSizeInput.addEventListener('change', handleStepSizeChange);
-  stepSizeInput.addEventListener('blur', handleStepSizeChange);
-
-  // Favorite speed input
-  favoriteSpeedInput.addEventListener('blur', handleFavoriteSpeedInput);
-  favoriteSpeedInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      handleFavoriteSpeedInput();
+    if (shouldPersist) {
+      await persistSettings({ currentSpeed: speed }, "Chưa lưu được tốc độ");
     }
-  });
+  }
 
-  // Save favorite button
-  saveFavoriteBtn.addEventListener('click', handleSaveFavorite);
+  function commitFavorite() {
+    var raw = $("favoriteSpeedInput").value.trim();
 
-  // Overlay opacity slider
-  overlayOpacitySlider.addEventListener('input', handleOpacityChange);
+    if (raw === "") {
+      state.favoriteSpeed = null;
+      return null;
+    }
 
-  // Site toggle
-  siteToggle.addEventListener('change', handleSiteToggle);
+    var value = Number(raw);
+    if (!Number.isFinite(value)) {
+      $("favoriteSpeedInput").value =
+        state.favoriteSpeed === null ? "" : Number(state.favoriteSpeed).toFixed(2);
+      return state.favoriteSpeed;
+    }
 
-  // Settings button
-  settingsBtn.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
-}
+    state.favoriteSpeed = clampSpeed(value);
+    $("favoriteSpeedInput").value = state.favoriteSpeed.toFixed(2);
+    return state.favoriteSpeed;
+  }
 
-// Handle speed change from slider
-async function handleSpeedChange(e) {
-  const newSpeed = parseFloat(e.target.value);
-  await setSpeed(newSpeed);
-}
+  function handleSiteToggle(enabled) {
+    if (!state.currentDomain) {
+      renderSiteState();
+      return;
+    }
 
-// Change speed by delta
-async function changeSpeed(delta) {
-  const newSpeed = Math.max(
-    DEFAULTS.minSpeed,
-    Math.min(DEFAULTS.maxSpeed, currentSpeed + delta)
-  );
-  await setSpeed(newSpeed);
-}
+    if (state.mode === "blacklist") {
+      state.blacklist = enabled
+        ? state.blacklist.filter(function (entry) {
+            return entry !== state.currentDomain;
+          })
+        : state.blacklist.concat([state.currentDomain]);
+    } else {
+      state.whitelist = enabled
+        ? state.whitelist.concat([state.currentDomain])
+        : state.whitelist.filter(function (entry) {
+            return entry !== state.currentDomain;
+          });
+    }
 
-// Set speed and send to content script
-async function setSpeed(speed) {
-  // Clamp and round
-  speed = Math.max(DEFAULTS.minSpeed, Math.min(DEFAULTS.maxSpeed, speed));
-  speed = Math.round(speed * 100) / 100;
-  let nextDisplaySpeed = speed;
-  let shouldPersist = true;
+    state.blacklist = Array.from(new Set(state.blacklist));
+    state.whitelist = Array.from(new Set(state.whitelist));
 
-  // Send to content script
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs.length > 0) {
-    try {
-      const response = await chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'setSpeed',
-        speed: speed
+    renderSiteState();
+
+    persistSettings(
+      { blacklist: state.blacklist, whitelist: state.whitelist },
+      "Chưa lưu được trạng thái trang này"
+    );
+  }
+
+  function commitStepSize() {
+    var input = $("stepSizeInput");
+    var value = clampStepSize(Number(input.value) || DEFAULTS.stepSize);
+    var changed = Math.abs(value - state.stepSize) > 0.0001;
+
+    state.stepSize = value;
+    input.value = value.toFixed(2);
+    renderStepPresets();
+
+    if (changed) {
+      persistSettings({ stepSize: value }, "Chưa lưu được bước nhảy");
+    }
+  }
+
+  function attachEventListeners() {
+    $("speedSlider").addEventListener("input", function () {
+      setSpeed(Number(this.value));
+    });
+
+    $("decreaseBtn").addEventListener("click", function () {
+      setSpeed(state.currentSpeed - state.stepSize);
+    });
+
+    $("increaseBtn").addEventListener("click", function () {
+      setSpeed(state.currentSpeed + state.stepSize);
+    });
+
+    $("resetBtn").addEventListener("click", function () {
+      setSpeed(state.defaultSpeed);
+    });
+
+    $("stepSizeInput").addEventListener("change", commitStepSize);
+    $("stepSizeInput").addEventListener("blur", commitStepSize);
+
+    $("favoriteSpeedInput").addEventListener("blur", function () {
+      var value = commitFavorite();
+      persistSettings({ favoriteSpeed: value }, "Chưa lưu được tốc độ yêu thích");
+    });
+
+    $("favoriteSpeedInput").addEventListener("keydown", function (event) {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      var value = commitFavorite();
+      persistSettings({ favoriteSpeed: value }, "Chưa lưu được tốc độ yêu thích");
+    });
+
+    $("saveFavoriteBtn").addEventListener("click", function () {
+      var value = commitFavorite();
+      if (value === null) {
+        value = state.currentSpeed;
+        state.favoriteSpeed = value;
+        $("favoriteSpeedInput").value = value.toFixed(2);
+      }
+      persistSettings({ favoriteSpeed: value }, "Chưa lưu được tốc độ yêu thích");
+      VSCUI.toast($("toastRegion"), "Đã lưu tốc độ yêu thích", "success");
+    });
+
+    $("overlayOpacitySlider").addEventListener("input", function () {
+      state.overlayOpacity = Number(this.value);
+      $("overlayOpacityValue").textContent = VSCUI.formatSpeed(state.overlayOpacity);
+      this.setAttribute("aria-valuetext", VSCUI.formatSpeed(state.overlayOpacity));
+      VSCUI.syncFill(this);
+      persistSettings({ overlayOpacity: state.overlayOpacity }, "Chưa lưu được độ trong suốt");
+    });
+
+    $("siteToggle").addEventListener("change", function () {
+      handleSiteToggle(this.checked);
+    });
+
+    $("settingsBtn").addEventListener("click", function () {
+      chrome.runtime.openOptionsPage().catch(function () {
+        VSCUI.toast($("toastRegion"), "Không mở được trang cài đặt", "error");
       });
-      if (response && response.currentSpeed !== undefined) {
-        nextDisplaySpeed = response.currentSpeed;
+    });
+
+    document.addEventListener("keydown", function (event) {
+      var tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        return;
       }
-      if (response && response.canControlSpeed === false) {
-        canControlCurrentTab = false;
-        shouldPersist = false;
-      } else {
-        canControlCurrentTab = true;
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      var command = POPUP_KEY_MAP[event.key.toLowerCase()];
+      if (!command) {
+        return;
+      }
+      event.preventDefault();
+      chrome.runtime.sendMessage({ action: "keyCommand", command: command }).catch(function () {});
+    });
+
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== "sync") {
+        return;
+      }
+      if (changes.currentSpeed && state.canControlCurrentTab) {
+        state.currentSpeed = changes.currentSpeed.newValue;
+        renderSpeed();
+      }
+    });
+  }
+
+  function renderAll(settings) {
+    state.currentSpeed = Number(settings.currentSpeed);
+    state.defaultSpeed = Number(settings.defaultSpeed);
+    state.stepSize = Number(settings.stepSize);
+    state.favoriteSpeed =
+      settings.favoriteSpeed === null || settings.favoriteSpeed === undefined
+        ? null
+        : Number(settings.favoriteSpeed);
+    state.overlayOpacity = Number(settings.overlayOpacity);
+    state.mode = settings.mode === "whitelist" ? "whitelist" : "blacklist";
+    state.blacklist = (settings.blacklist || []).slice();
+    state.whitelist = (settings.whitelist || []).slice();
+
+    applyBounds();
+    VSCTheme.apply(settings.theme);
+
+    renderSpeed();
+    renderStepPresets();
+    $("stepSizeInput").value = state.stepSize.toFixed(2);
+    $("favoriteSpeedInput").value =
+      state.favoriteSpeed === null ? "" : state.favoriteSpeed.toFixed(2);
+    $("overlayOpacitySlider").value = String(state.overlayOpacity);
+    $("overlayOpacityValue").textContent = VSCUI.formatSpeed(state.overlayOpacity);
+    $("overlayOpacitySlider").setAttribute(
+      "aria-valuetext",
+      VSCUI.formatSpeed(state.overlayOpacity)
+    );
+    VSCUI.syncFill($("overlayOpacitySlider"));
+    renderSiteState();
+  }
+
+  async function init() {
+    var settings = {};
+
+    try {
+      settings = await chrome.storage.sync.get(null);
+    } catch (err) {
+      VSCUI.toast($("toastRegion"), "Không đọc được cài đặt", "error");
+    }
+
+    var tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    } catch (err) {
+      tabs = [];
+    }
+
+    var target = tabs.length > 0 ? tabs[0] : null;
+
+    if (target && target.url) {
+      try {
+        var url = new URL(target.url);
+        if (url.protocol === "http:" || url.protocol === "https:") {
+          state.currentDomain = url.hostname;
+          state.currentPagePort = url.port || (url.protocol === "https:" ? "443" : "80");
+        }
+      } catch (err) {
+        state.currentDomain = "";
+        state.currentPagePort = "";
+      }
+    }
+
+    renderAll(Object.assign({}, DEFAULTS, settings));
+    attachEventListeners();
+
+    $("siteToggle").disabled = !state.currentDomain;
+    $("siteToggle").title = state.currentDomain
+      ? ""
+      : "Chỉ điều khiển được trên trang web thường";
+
+    if (!target) {
+      return;
+    }
+
+    try {
+      var response = await chrome.tabs.sendMessage(target.id, { action: "getStatus" });
+      if (response && response.currentSpeed !== undefined) {
+        state.currentSpeed = response.currentSpeed;
+        state.canControlCurrentTab = response.canControlSpeed !== false;
+        renderSpeed();
+        renderControlsState();
       }
     } catch (err) {
-      // Content script not available
-      canControlCurrentTab = true;
+      /* content script không chạy trên tab này */
     }
   }
 
-  currentSpeed = nextDisplaySpeed;
-  updateSpeedDisplay();
-  updateSpeedControlsState();
-
-  if (shouldPersist) {
-    await chrome.storage.sync.set({ currentSpeed: speed });
-  }
-}
-
-// Handle step size change
-async function handleStepSizeChange(e) {
-  let value = parseFloat(e.target.value);
-  // Clamp to valid range and round to 2 decimals
-  value = Math.max(DEFAULTS.minSpeed, Math.min(DEFAULTS.maxSpeed, value));
-  value = Math.round(value * 100) / 100;
-  stepSize = value;
-  stepSizeInput.value = value.toFixed(2);
-  renderStepPresets();
-  await chrome.storage.sync.set({ stepSize });
-}
-
-// Handle favorite speed input
-async function handleFavoriteSpeedInput() {
-  const value = favoriteSpeedInput.value.trim();
-
-  if (value === '') {
-    favoriteSpeed = null;
-  } else {
-    let speed = parseFloat(value);
-    if (!isNaN(speed)) {
-      speed = Math.max(DEFAULTS.minSpeed, Math.min(DEFAULTS.maxSpeed, speed));
-      speed = Math.round(speed * 100) / 100;
-      favoriteSpeed = speed;
-      favoriteSpeedInput.value = speed.toFixed(2);
-    } else {
-      // Invalid input, revert
-      if (favoriteSpeed !== null) {
-        favoriteSpeedInput.value = favoriteSpeed.toFixed(2);
-      } else {
-        favoriteSpeedInput.value = '';
-      }
-    }
-  }
-
-  await chrome.storage.sync.set({ favoriteSpeed });
-}
-
-// Handle save favorite button
-async function handleSaveFavorite() {
-  const inputValue = favoriteSpeedInput.value.trim();
-  let speed;
-  if (inputValue !== '') {
-    const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
-      speed = Math.max(DEFAULTS.minSpeed, Math.min(DEFAULTS.maxSpeed, parsed));
-      speed = Math.round(speed * 100) / 100;
-    }
-  }
-  if (speed === undefined) {
-    speed = currentSpeed;
-  }
-  favoriteSpeed = speed;
-  favoriteSpeedInput.value = speed.toFixed(2);
-  await chrome.storage.sync.set({ favoriteSpeed });
-}
-
-// Handle overlay opacity change
-async function handleOpacityChange(e) {
-  overlayOpacity = parseFloat(e.target.value);
-  overlayOpacityValue.textContent = overlayOpacity.toFixed(2);
-  await chrome.storage.sync.set({ overlayOpacity });
-}
-
-// Handle site toggle
-async function handleSiteToggle(e) {
-  const isEnabled = e.target.checked;
-
-  if (isBlacklistMode) {
-    // Blacklist mode
-    if (isEnabled) {
-      // Remove from blacklist
-      blacklist = blacklist.filter(domain => domain !== currentDomain);
-    } else {
-      // Add to blacklist
-      if (!blacklist.includes(currentDomain)) {
-        blacklist.push(currentDomain);
-      }
-    }
-  } else {
-    // Whitelist mode
-    if (isEnabled) {
-      // Add to whitelist
-      if (!whitelist.includes(currentDomain)) {
-        whitelist.push(currentDomain);
-      }
-    } else {
-      // Remove from whitelist
-      whitelist = whitelist.filter(domain => domain !== currentDomain);
-    }
-  }
-
-  await chrome.storage.sync.set({ blacklist, whitelist });
-}
-
-// Initialize on load
-document.addEventListener('DOMContentLoaded', initPopup);
-
-// Live-update popup UI when storage changes from outside (keyboard shortcuts)
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'sync') return;
-  if (changes.currentSpeed && canControlCurrentTab) {
-    currentSpeed = changes.currentSpeed.newValue;
-    updateSpeedDisplay();
-  }
-});
-
-// Keyboard shortcuts inside popup (D/S/R/G/V)
-const POPUP_KEY_MAP = {
-  'd': 'speed-up',
-  's': 'speed-down',
-  'r': 'speed-reset',
-  'g': 'speed-favorite',
-  'v': 'toggle-overlay',
-};
-
-document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  const command = POPUP_KEY_MAP[e.key.toLowerCase()];
-  if (!command) return;
-  e.preventDefault();
-  chrome.runtime.sendMessage({ action: 'keyCommand', command });
-});
+  document.addEventListener("DOMContentLoaded", init);
+})();

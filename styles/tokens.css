@@ -1,0 +1,230 @@
+/* ==========================================================================
+   Video Speed Controller — Design Tokens
+   Nguồn: docs/ui-design/system_design.md §3
+   ========================================================================== */
+
+:root {
+  /* Spacing — base 4/8 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Typography */
+  --font-ui: "Be Vietnam Pro", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-brand: "Chakra Petch", "Be Vietnam Pro", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+
+  --text-h1: 24px;
+  --lh-h1: 34px;
+  --text-h2: 17px;
+  --lh-h2: 26px;
+  --text-body: 14px;
+  --lh-body: 22px;
+  --text-label: 13px;
+  --lh-label: 20px;
+  --text-caption: 12px;
+  --lh-caption: 18px;
+  --text-micro: 11px;
+  --lh-micro: 16px;
+
+  /* Brand gradient — focal element duy nhất, chỉ dùng cho logo */
+  --brand-gradient: linear-gradient(135deg, #22e0ff 0%, #8b7bff 55%, #e040fb 100%);
+
+  /* Layout */
+  --sidebar-w: 232px;
+  --content-w: 760px;
+  --page-w: 1120px;
+  --topbar-h: 64px;
+}
+
+/* Dark theme — mặc định */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #08070d;
+  --surface: #100e18;
+  --surface-2: #17141f;
+  --surface-3: #1f1b2c;
+
+  --border: #241f33;
+  --border-strong: #382f4e;
+  --border-control: #6b5f94;
+
+  --text-1: #f2f0fa;
+  --text-2: #a8a3c0;
+  --text-3: #8b85a6;
+
+  --accent: #22e0ff;
+  --accent-hover: #5ceaff;
+  --accent-active: #00b8d9;
+  --accent-ink: #04141a;
+  --accent-soft: rgba(34, 224, 255, 0.12);
+  --accent-2: #e040fb;
+  --accent-2-soft: rgba(224, 64, 251, 0.14);
+
+  --success: #3ddc97;
+  --warning: #ffb23d;
+  --danger: #ff5c7a;
+  --danger-soft: rgba(255, 92, 122, 0.12);
+  --focus-ring: #22e0ff;
+
+  --brand-tile: #14121f;
+  --brand-tile-border: #2a2440;
+}
+
+/* Light theme — theo hệ thống khi người dùng chưa chọn */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --bg: #f5f4f9;
+    --surface: #ffffff;
+    --surface-2: #fbfafe;
+    --surface-3: #f0eef7;
+
+    --border: #e3e0ec;
+    --border-strong: #c9c3d9;
+    --border-control: #8e86a8;
+
+    --text-1: #14121f;
+    --text-2: #4a4459;
+    --text-3: #6b6480;
+
+    --accent: #007a94;
+    --accent-hover: #00657b;
+    --accent-active: #00505f;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(0, 122, 148, 0.1);
+    --accent-2: #a81fbf;
+    --accent-2-soft: rgba(168, 31, 191, 0.12);
+
+    --success: #1f8a5b;
+    --warning: #a05f00;
+    --danger: #c42a45;
+    --danger-soft: rgba(196, 42, 69, 0.08);
+    --focus-ring: #007a94;
+
+    --brand-tile: #14121f;
+    --brand-tile-border: #2a2440;
+
+    --shadow-sm: 0 1px 2px rgba(20, 18, 31, 0.08);
+    --shadow-md: 0 8px 24px rgba(20, 18, 31, 0.1);
+    --shadow-pop: 0 16px 40px rgba(20, 18, 31, 0.16);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f5f4f9;
+  --surface: #ffffff;
+  --surface-2: #fbfafe;
+  --surface-3: #f0eef7;
+
+  --border: #e3e0ec;
+  --border-strong: #c9c3d9;
+  --border-control: #8e86a8;
+
+  --text-1: #14121f;
+  --text-2: #4a4459;
+  --text-3: #6b6480;
+
+  --accent: #007a94;
+  --accent-hover: #00657b;
+  --accent-active: #00505f;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(0, 122, 148, 0.1);
+  --accent-2: #a81fbf;
+  --accent-2-soft: rgba(168, 31, 191, 0.12);
+
+  --success: #1f8a5b;
+  --warning: #a05f00;
+  --danger: #c42a45;
+  --danger-soft: rgba(196, 42, 69, 0.08);
+  --focus-ring: #007a94;
+
+  --shadow-sm: 0 1px 2px rgba(20, 18, 31, 0.08);
+  --shadow-md: 0 8px 24px rgba(20, 18, 31, 0.1);
+  --shadow-pop: 0 16px 40px rgba(20, 18, 31, 0.16);
+}
+
+/* Reset tối thiểu */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--accent);
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}

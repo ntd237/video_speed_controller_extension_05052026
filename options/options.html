@@ -3,139 +3,338 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Speed Controller - Cài đặt</title>
+  <title>Video Speed Controller — Cài đặt</title>
+  <link rel="stylesheet" href="../styles/tokens.css">
+  <link rel="stylesheet" href="../styles/components.css">
   <link rel="stylesheet" href="options.css">
+  <script src="../config/defaults.js"></script>
+  <script src="../config/ui.js"></script>
+  <script src="../shared/theme.js"></script>
 </head>
 <body>
-  <div id="options-container">
-    <!-- Header -->
-    <div class="header">
-      <h1 class="header-title">⚙ Video Speed Controller — Cài đặt</h1>
-    </div>
+  <div class="app">
+    <aside class="sidebar">
+      <a class="brand" href="#top" aria-label="Video Speed Controller">
+        <span class="brand-tile">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="brandGrad" x1="4" y1="4" x2="21" y2="20" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#22E0FF"></stop>
+                <stop offset="0.55" stop-color="#8B7BFF"></stop>
+                <stop offset="1" stop-color="#E040FB"></stop>
+              </linearGradient>
+            </defs>
+            <path d="m5 17 5-5-5-5" stroke="url(#brandGrad)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="m12 17 5-5-5-5" stroke="url(#brandGrad)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">Video Speed</span>
+          <span class="brand-sub">Controller</span>
+        </span>
+      </a>
 
-    <!-- Mode Selection -->
-    <section class="section">
-      <h2 class="section-title">Chế độ hoạt động</h2>
-      <div class="radio-group">
-        <label class="radio-label">
-          <input type="radio" name="mode" value="blacklist" id="mode-blacklist">
-          <span>Blacklist (mặc định ở mọi nơi)</span>
-        </label>
-        <label class="radio-label">
-          <input type="radio" name="mode" value="whitelist" id="mode-whitelist">
-          <span>Whitelist (chỉ trang được chọn)</span>
-        </label>
-      </div>
-    </section>
+      <nav class="side-nav" aria-label="Điều hướng cài đặt">
+        <a class="side-link is-active" href="#nhom-trang-web" data-spy="nhom-trang-web" title="Chế độ và trang web">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+            <path d="M2 12h20"></path>
+          </svg>
+          <span>Chế độ và trang web</span>
+        </a>
+        <a class="side-link" href="#nhom-toc-do" data-spy="nhom-toc-do" title="Tốc độ">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="m12 14 4-4"></path>
+            <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
+          </svg>
+          <span>Tốc độ</span>
+        </a>
+        <a class="side-link" href="#nhom-hien-thi" data-spy="nhom-hien-thi" title="Hiển thị">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span>Hiển thị</span>
+        </a>
+        <a class="side-link" href="#nhom-phim-tat" data-spy="nhom-phim-tat" title="Phím tắt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <rect width="20" height="16" x="2" y="4" rx="2"></rect>
+            <path d="M6 8h.01"></path>
+            <path d="M10 8h.01"></path>
+            <path d="M14 8h.01"></path>
+            <path d="M18 8h.01"></path>
+            <path d="M8 12h.01"></path>
+            <path d="M12 12h.01"></path>
+            <path d="M16 12h.01"></path>
+            <path d="M7 16h10"></path>
+          </svg>
+          <span>Phím tắt</span>
+        </a>
+      </nav>
 
-    <!-- Blacklist Section -->
-    <section class="section" id="blacklist-section" style="display: none;">
-      <h2 class="section-title">Danh sách Blacklist</h2>
-      <div class="domain-input-group">
-        <textarea id="blacklist-input" class="domain-textarea" spellcheck="false"
-          placeholder="Mỗi dòng một trang web, ví dụ:&#10;youtube.com&#10;192.168.1.10:8080"></textarea>
-        <button id="blacklist-add-btn" class="btn btn-add domain-save-btn">Lưu</button>
-      </div>
-    </section>
-
-    <!-- Whitelist Section -->
-    <section class="section" id="whitelist-section" style="display: none;">
-      <h2 class="section-title">Danh sách Whitelist</h2>
-      <div class="domain-input-group">
-        <textarea id="whitelist-input" class="domain-textarea" spellcheck="false"
-          placeholder="Mỗi dòng một trang web, ví dụ:&#10;youtube.com&#10;192.168.1.10:8080"></textarea>
-        <button id="whitelist-add-btn" class="btn btn-add domain-save-btn">Lưu</button>
-      </div>
-    </section>
-
-    <!-- Speed Settings -->
-    <section class="section">
-      <h2 class="section-title">Cài đặt tốc độ</h2>
-
-      <div class="setting-row">
-        <label for="step-size" class="label">Bước tăng/giảm:</label>
-        <input type="number" id="step-size" class="input-number" min="0.01" max="16" step="0.01" value="0.5">
-      </div>
-
-      <div class="setting-row">
-        <label for="default-speed" class="label">Tốc độ mặc định:</label>
-        <div class="slider-display-row">
-          <input type="range" id="default-speed" class="slider" min="0.1" max="16" step="0.05">
-          <span id="default-speed-value" class="speed-value">1.00x</span>
+      <div class="side-foot">
+        <div class="version-line">
+          <span>Phiên bản</span>
+          <span class="version-badge" id="versionBadge">1.7.0</span>
         </div>
       </div>
+    </aside>
 
-      <div class="setting-row">
-        <label for="favorite-speed" class="label">Tốc độ yêu thích:</label>
-        <input type="number" id="favorite-speed" class="input-number" min="0.1" max="16" step="0.01" placeholder="Để trống nếu không dùng">
-      </div>
-    </section>
-
-    <!-- Display Settings -->
-    <section class="section">
-      <h2 class="section-title">Hiển thị</h2>
-
-      <div class="toggle-row">
-        <label for="show-overlay" class="label">Hiển thị overlay tốc độ</label>
-        <label class="toggle-switch">
-          <input type="checkbox" id="show-overlay">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <label for="overlay-opacity" class="label">Độ trong suốt:</label>
-        <div class="slider-display-row">
-          <input type="range" id="overlay-opacity" class="slider" min="0.1" max="1.0" step="0.05">
-          <span id="overlay-opacity-value" class="opacity-value">0.70</span>
+    <div class="content-col" id="top">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="save-state">
+            <span class="state-dot" id="stateDot" data-state="saved" aria-hidden="true"></span>
+            <span id="stateText" role="status" aria-live="polite">Tất cả thay đổi đã được lưu</span>
+          </div>
+          <button class="btn btn-primary" id="saveAll" type="button">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-text">Lưu cài đặt</span>
+          </button>
         </div>
-      </div>
+      </header>
 
-      <div class="toggle-row">
-        <label for="auto-apply" class="label">Tự động áp dụng tốc độ</label>
-        <label class="toggle-switch">
-          <input type="checkbox" id="auto-apply">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </section>
+      <nav class="mobile-nav" aria-label="Điều hướng cài đặt">
+        <a class="mobile-link is-active" href="#nhom-trang-web" data-spy="nhom-trang-web">Trang web</a>
+        <a class="mobile-link" href="#nhom-toc-do" data-spy="nhom-toc-do">Tốc độ</a>
+        <a class="mobile-link" href="#nhom-hien-thi" data-spy="nhom-hien-thi">Hiển thị</a>
+        <a class="mobile-link" href="#nhom-phim-tat" data-spy="nhom-phim-tat">Phím tắt</a>
+      </nav>
 
-    <!-- Keyboard Shortcuts -->
-    <section class="section">
-      <h2 class="section-title">Phím tắt (chỉ đọc)</h2>
-      <div class="shortcuts-list">
-        <div class="shortcut-item">
-          <span class="shortcut-key">D</span>
-          <span class="shortcut-desc">Tăng tốc độ</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">S</span>
-          <span class="shortcut-desc">Giảm tốc độ</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">R</span>
-          <span class="shortcut-desc">Reset về 1x</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">G</span>
-          <span class="shortcut-desc">Áp dụng yêu thích</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">V</span>
-          <span class="shortcut-desc">Hiện/ẩn overlay</span>
-        </div>
-      </div>
-      <p class="shortcuts-note">Tùy chỉnh tại chrome://extensions/shortcuts</p>
-    </section>
+      <main class="main">
+        <div class="page">
+          <h1 class="page-title">Cài đặt</h1>
 
-    <!-- Save Button -->
-    <div class="save-section">
-      <button id="save-btn" class="btn btn-primary btn-save">💾 Lưu cài đặt</button>
-      <div id="save-message" class="save-message" style="display: none;">✓ Đã lưu!</div>
+          <section class="group" id="nhom-trang-web" aria-labelledby="title-trang-web">
+            <div class="group-head">
+              <h2 class="group-title" id="title-trang-web">
+                Chế độ và trang web
+                <span class="rule" aria-hidden="true"></span>
+              </h2>
+            </div>
+
+            <div class="card">
+              <div class="field">
+                <div class="field-head">
+                  <span class="field-label" id="modeLabel">Chế độ hoạt động</span>
+                </div>
+
+                <div class="mode-grid" role="radiogroup" aria-labelledby="modeLabel">
+                  <label class="mode-option" data-mode-choice="blacklist">
+                    <input type="radio" name="mode" id="mode-blacklist" value="blacklist" checked>
+                    <span class="mode-dot" aria-hidden="true"></span>
+                    <span class="mode-name">Danh sách chặn</span>
+                  </label>
+                  <label class="mode-option" data-mode-choice="whitelist">
+                    <input type="radio" name="mode" id="mode-whitelist" value="whitelist">
+                    <span class="mode-dot" aria-hidden="true"></span>
+                    <span class="mode-name">Danh sách cho phép</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field list-panel" id="panel-blacklist">
+                <div class="list-bar">
+                  <span class="list-name">Danh sách chặn</span>
+                  <span class="count-chip" id="count-blacklist" data-tone="ok">0 trang</span>
+                </div>
+                <label class="visually-hidden" for="list-blacklist">Danh sách trang bị chặn</label>
+                <textarea class="textarea" id="list-blacklist" spellcheck="false"
+                  placeholder="Mỗi dòng một trang, ví dụ:&#10;youtube.com&#10;192.168.1.10:8080"></textarea>
+                <div class="field-error" id="error-blacklist" role="alert" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8v4"></path>
+                    <path d="M12 16h.01"></path>
+                  </svg>
+                  <div>
+                    <div class="error-title">Chưa lưu được danh sách chặn</div>
+                    <div class="error-list" id="error-blacklist-list"></div>
+                  </div>
+                </div>
+                <div class="list-actions">
+                  <button class="btn btn-ghost" id="save-blacklist" type="button" disabled>
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-text">Lưu danh sách</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field list-panel" id="panel-whitelist" hidden>
+                <div class="list-bar">
+                  <span class="list-name">Danh sách cho phép</span>
+                  <span class="count-chip" id="count-whitelist" data-tone="ok">0 trang</span>
+                </div>
+                <label class="visually-hidden" for="list-whitelist">Danh sách trang được phép</label>
+                <textarea class="textarea" id="list-whitelist" spellcheck="false"
+                  placeholder="Mỗi dòng một trang, ví dụ:&#10;youtube.com&#10;192.168.1.10:8080"></textarea>
+                <div class="field-error" id="error-whitelist" role="alert" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8v4"></path>
+                    <path d="M12 16h.01"></path>
+                  </svg>
+                  <div>
+                    <div class="error-title">Chưa lưu được danh sách cho phép</div>
+                    <div class="error-list" id="error-whitelist-list"></div>
+                  </div>
+                </div>
+                <div class="list-actions">
+                  <button class="btn btn-ghost" id="save-whitelist" type="button" disabled>
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-text">Lưu danh sách</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="group" id="nhom-toc-do" aria-labelledby="title-toc-do">
+            <div class="group-head">
+              <h2 class="group-title" id="title-toc-do">
+                Tốc độ
+                <span class="rule" aria-hidden="true"></span>
+              </h2>
+            </div>
+
+            <div class="card">
+              <div class="field">
+                <div class="field-row">
+                  <label class="field-label" for="step-size">Bước nhảy</label>
+                  <div class="step-controls">
+                    <div class="presets" id="stepPresets" role="group" aria-label="Bước nhảy gợi ý"></div>
+                    <div class="num-field">
+                      <input type="number" id="step-size" value="0.50">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="field-row">
+                  <label class="field-label" for="default-speed">Tốc độ mặc định</label>
+                  <div class="slider-row">
+                    <input type="range" class="slider" id="default-speed" value="1.00">
+                    <output class="num-value" id="default-speed-value" for="default-speed"
+                      aria-live="off">1.00</output>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="field-row">
+                  <label class="field-label" for="favorite-speed">Tốc độ yêu thích</label>
+                  <div class="num-field">
+                    <input type="number" id="favorite-speed" placeholder="Trống">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="group" id="nhom-hien-thi" aria-labelledby="title-hien-thi">
+            <div class="group-head">
+              <h2 class="group-title" id="title-hien-thi">
+                Hiển thị
+                <span class="rule" aria-hidden="true"></span>
+              </h2>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-main">
+                  <label class="field-label" for="show-overlay">Hiện overlay tốc độ</label>
+                </div>
+                <span class="switch">
+                  <input type="checkbox" id="show-overlay" checked>
+                  <span class="switch-track" aria-hidden="true"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row-main">
+                  <label class="field-label" for="overlay-opacity">Độ trong suốt overlay</label>
+                </div>
+                <div class="slider-row">
+                  <input type="range" class="slider" id="overlay-opacity" value="0.70">
+                  <output class="num-value" id="overlay-opacity-value" for="overlay-opacity"
+                    aria-live="off">0.70</output>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="row-main">
+                  <span class="field-label" id="themeLabel">Giao diện</span>
+                </div>
+                <div class="segmented" role="group" aria-labelledby="themeLabel">
+                  <button type="button" data-theme-choice="system" aria-pressed="true">Hệ thống</button>
+                  <button type="button" data-theme-choice="light" aria-pressed="false">Sáng</button>
+                  <button type="button" data-theme-choice="dark" aria-pressed="false">Tối</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="row-main">
+                  <label class="field-label" for="auto-apply">Tự động áp dụng tốc độ</label>
+                </div>
+                <span class="switch">
+                  <input type="checkbox" id="auto-apply" checked>
+                  <span class="switch-track" aria-hidden="true"></span>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section class="group" id="nhom-phim-tat" aria-labelledby="title-phim-tat">
+            <div class="group-head">
+              <h2 class="group-title" id="title-phim-tat">
+                Phím tắt
+                <span class="rule" aria-hidden="true"></span>
+              </h2>
+            </div>
+
+            <div class="card">
+              <div class="shortcut-list">
+                <div class="shortcut">
+                  <span class="shortcut-desc">Tăng tốc độ</span>
+                  <kbd>D</kbd>
+                </div>
+                <div class="shortcut">
+                  <span class="shortcut-desc">Giảm tốc độ</span>
+                  <kbd>S</kbd>
+                </div>
+                <div class="shortcut">
+                  <span class="shortcut-desc">Tốc độ mặc định</span>
+                  <kbd>R</kbd>
+                </div>
+                <div class="shortcut">
+                  <span class="shortcut-desc">Tốc độ yêu thích</span>
+                  <kbd>G</kbd>
+                </div>
+                <div class="shortcut">
+                  <span class="shortcut-desc">Hiện hoặc ẩn overlay</span>
+                  <kbd>V</kbd>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   </div>
 
-  <script src="../config/defaults.js"></script>
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="../shared/ui.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 > Chrome extension để điều chỉnh tốc độ phát video HTML5 trên mọi trang web bằng phím tắt đơn giản và overlay hiển thị tốc độ trực tiếp trên video.
 
-![Version](https://img.shields.io/badge/version-1.6.0-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-blue)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green)
 ![License](https://img.shields.io/badge/license-CC%20BY--NC--ND%204.0-lightgrey)
 
@@ -102,17 +102,18 @@ Nhấn vào icon extension trong thanh công cụ để mở popup:
 - **Tốc độ yêu thích**: Nhập tốc độ ưa thích → nhấn **Lưu** để ghi nhớ
 - **Độ trong suốt**: Kéo slider để điều chỉnh độ trong suốt của overlay
 - **Toggle trang**: Bật/tắt extension cho domain hiện tại
-- **Nút Cài đặt**: Mở trang Options để cấu hình nâng cao
+- **Nút Mở cài đặt**: Mở trang Options để cấu hình nâng cao
 
 ### Trang Options
 
-Truy cập tại `chrome://extensions/` → nhấn **Details** → **Extension options**, hoặc nhấn nút **Cài đặt** trong popup:
+Truy cập tại `chrome://extensions/` → nhấn **Details** → **Extension options**, hoặc nhấn nút **Mở cài đặt** trong popup. Trang có sidebar điều hướng theo nhóm cài đặt và thanh lưu cố định ở đầu trang:
 
-- Chọn chế độ **Blacklist** (mặc định ở mọi nơi, trừ danh sách) hoặc **Whitelist** (chỉ trang trong danh sách)
-- Quản lý danh sách domain
-- Cài tốc độ mặc định và tốc độ yêu thích
-- Bật/tắt overlay và điều chỉnh độ trong suốt
-- Bật/tắt tự động áp dụng tốc độ
+- **Chế độ và trang web**: chọn **Danh sách chặn** hoặc **Danh sách cho phép**, sửa toàn bộ danh sách trong một vùng soạn thảo (mỗi dòng một trang), lỗi nhập liệu hiển thị ngay dưới danh sách
+- **Tốc độ**: bước nhảy (kèm preset), tốc độ mặc định, tốc độ yêu thích
+- **Hiển thị**: bật/tắt overlay, độ trong suốt, giao diện **Hệ thống / Sáng / Tối**, tự động áp dụng tốc độ
+- **Phím tắt**: danh sách phím tắt đang dùng
+
+Thay đổi chưa lưu được báo bằng chấm trạng thái ở thanh trên; nhấn **Lưu cài đặt** (hoặc `Ctrl/Cmd + S`) để ghi vào `chrome.storage.sync`.
 
 ---
 
@@ -140,18 +141,25 @@ Các phím tắt hoạt động khi **trang web đang có focus** (không phải
 video_speed_controller_extension_extension_05052026/
 ├── manifest.json           # Cấu hình extension (MV3)
 ├── config/
-│   └── defaults.js         # Hằng số mặc định dùng chung
+│   ├── defaults.js         # Hằng số mặc định dùng chung
+│   └── ui.js               # Tham số giao diện (thời lượng toast, ngưỡng scroll spy)
+├── styles/
+│   ├── tokens.css          # Design token: màu, chữ, khoảng cách, theme sáng/tối
+│   └── components.css      # Component dùng chung cho options và popup
+├── shared/
+│   ├── theme.js            # Áp theme trước khi vẽ trang + lưu lựa chọn
+│   └── ui.js               # Tiện ích UI dùng chung (toast, clamp, slider fill)
 ├── background/
 │   └── service_worker.js   # Xử lý lệnh phím tắt từ content script
 ├── content/
 │   └── content.js          # Script inject vào trang, quản lý tốc độ & overlay
 ├── popup/
 │   ├── popup.html          # UI popup chính
-│   ├── popup.css           # Style popup
+│   ├── popup.css           # Style riêng của popup
 │   └── popup.js            # Logic popup
 ├── options/
 │   ├── options.html        # Trang cài đặt nâng cao
-│   ├── options.css         # Style trang cài đặt
+│   ├── options.css         # Khung trang cài đặt
 │   └── options.js          # Logic trang cài đặt
 ├── icons/
 │   ├── icon16.png
@@ -166,10 +174,15 @@ video_speed_controller_extension_extension_05052026/
 | Module | Mô tả |
 |--------|-------|
 | `config/defaults.js` | DEFAULTS object chia sẻ cho tất cả scripts; mọi hằng số đều khai báo ở đây |
+| `config/ui.js` | Tham số riêng của giao diện, tách khỏi DEFAULTS để content script không phải tải |
+| `styles/tokens.css` | Token màu/khoảng cách/cỡ chữ cho cả hai theme |
+| `styles/components.css` | Button, chip, số, slider, switch, card, toast dùng chung |
+| `shared/theme.js` | Đọc cache cục bộ để áp theme ngay khi trang bắt đầu vẽ, lưu lựa chọn vào storage |
+| `shared/ui.js` | Hàm tiện ích UI dùng chung cho options và popup |
 | `content/content.js` | Inject vào mọi trang; phát hiện video, áp dụng tốc độ, tạo overlay, lắng nghe phím tắt |
 | `background/service_worker.js` | Nhận lệnh từ content script, tính tốc độ mới, lưu storage, gửi lại content script |
 | `popup/popup.js` | Điều khiển UI popup; đồng bộ live với storage khi phím tắt thay đổi tốc độ |
-| `options/options.js` | Quản lý cài đặt nâng cao; blacklist/whitelist, tốc độ mặc định, hiển thị overlay |
+| `options/options.js` | Quản lý cài đặt nâng cao; blacklist/whitelist, tốc độ, hiển thị, giao diện |
 
 ---
 
@@ -182,13 +195,16 @@ Tất cả giá trị mặc định được khai báo trong `config/defaults.js
 | `currentSpeed` | `1.0` | Tốc độ hiện tại |
 | `defaultSpeed` | `1.0` | Tốc độ reset (phím R) |
 | `stepSize` | `0.5` | Bước tăng/giảm mỗi lần nhấn phím |
-| `favoriteSpeed` | `3` | Tốc độ yêu thích (phím G) |
+| `favoriteSpeed` | `2` | Tốc độ yêu thích (phím G) |
 | `autoApply` | `true` | Tự động áp dụng tốc độ khi tải trang |
 | `showOverlay` | `true` | Hiển thị overlay tốc độ trên video |
 | `overlayOpacity` | `0.7` | Độ trong suốt overlay (0.1 – 1.0) |
 | `mode` | `'blacklist'` | Chế độ hoạt động: `'blacklist'` hoặc `'whitelist'` |
+| `theme` | `'system'` | Giao diện: `'system'`, `'light'` hoặc `'dark'` |
 | `minSpeed` | `0.1` | Tốc độ tối thiểu |
 | `maxSpeed` | `20.0` | Tốc độ tối đa |
+| `minStepSize` | `0.01` | Bước nhảy tối thiểu |
+| `maxStepSize` | `20.0` | Bước nhảy tối đa |
 | `stepSizeOptions` | `[0.25, 0.5, 1.0, 2.0]` | Các preset bước nhảy trong UI |
 
 ---
