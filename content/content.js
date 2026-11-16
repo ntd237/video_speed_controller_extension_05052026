@@ -487,6 +487,16 @@
             canControlSpeed: hasControllableVideo(),
           });
         }
+
+        if (msg.action === 'keyCommand') {
+          const videos = collectVideos(document.documentElement);
+          if (videos.length === 0) {
+            return;
+          }
+
+          const result = handleShortcut(msg.command, videos);
+          sendResponse({ ok: true, ...result });
+        }
       } catch (error) {
         console.error('Lỗi xử lý tin nhắn:', error);
         sendResponse({ ok: false, error: error.message });
@@ -502,33 +512,178 @@
     'v': 'toggle-overlay',
   };
 
-  function initKeyListener() {
-    document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const command = KEY_COMMAND_MAP[e.key.toLowerCase()];
-      if (!command) return;
+  const KEY_CODE_MAP = {
+    KeyD: 'speed-up',
+    KeyS: 'speed-down',
+    KeyR: 'speed-reset',
+    KeyG: 'speed-favorite',
+    KeyV: 'toggle-overlay',
+  };
+
+  const VK_PACKET = 231;
+  const VK_PROCESSKEY = 229;
+
+  let currentSettings = { ...DEFAULTS };
+
+  function resolveShortcutCommand(event) {
+    const byKey = KEY_COMMAND_MAP[String(event.key || '').toLowerCase()];
+    if (byKey) return byKey;
+    return KEY_CODE_MAP[event.code] || null;
+  }
+
+  function getStepSize(settings) {
+    const step = Number(settings.stepSize);
+    return Number.isFinite(step) && step > 0 ? step : DEFAULTS.stepSize;
+  }
+
+  function computeNextSpeed(command, settings) {
+    const baseSpeed = Number(settings.currentSpeed);
+
+    if (command === 'speed-up') {
+      return baseSpeed + getStepSize(settings);
+    }
+    if (command === 'speed-down') {
+      return baseSpeed - getStepSize(settings);
+    }
+    if (command === 'speed-reset') {
+      return Number(settings.defaultSpeed);
+    }
+    if (command === 'speed-favorite') {
+      if (settings.favoriteSpeed === null || settings.favoriteSpeed === undefined) {
+        return null;
+      }
+      return Number(settings.favoriteSpeed);
+    }
+    return null;
+  }
+
+  function persistSettingsPatch(patch) {
+    try {
       if (!isExtensionContextValid()) return;
-      e.preventDefault();
-      try {
-        chrome.runtime.sendMessage({ action: 'keyCommand', command });
-      } catch (error) {
+      const pending = chrome.storage.sync.set(patch);
+      if (pending && typeof pending.catch === 'function') {
+        pending.catch(() => {});
+      }
+    } catch (error) {
+    }
+  }
+
+  function handleShortcut(command, videos) {
+    const settings = currentSettings;
+    const targets = videos || collectVideos(document.documentElement);
+
+    if (command === 'toggle-overlay') {
+      currentSettings = { ...settings, showOverlay: !settings.showOverlay };
+      persistSettingsPatch({ showOverlay: currentSettings.showOverlay });
+      updateAllOverlays(currentSettings);
+      return {
+        handled: true,
+        applied: true,
+        hasVideo: targets.length > 0,
+        currentSpeed: currentSettings.currentSpeed,
+      };
+    }
+
+    const rawSpeed = computeNextSpeed(command, settings);
+    if (rawSpeed === null || !Number.isFinite(rawSpeed)) {
+      return {
+        handled: true,
+        applied: false,
+        hasVideo: targets.length > 0,
+        currentSpeed: settings.currentSpeed,
+      };
+    }
+
+    const nextSpeed = Math.round(clampSpeed(rawSpeed) * 100) / 100;
+    currentSettings = { ...settings, currentSpeed: nextSpeed };
+    persistSettingsPatch({ currentSpeed: nextSpeed });
+
+    if (targets.length > 0) {
+      void applySpeedToAllVideos(nextSpeed, currentSettings, { force: true });
+    }
+
+    return {
+      handled: true,
+      applied: true,
+      hasVideo: targets.length > 0,
+      currentSpeed: nextSpeed,
+    };
+  }
+
+  function forwardShortcutCommand(command) {
+    try {
+      chrome.runtime.sendMessage({ action: 'keyCommand', command });
+    } catch (error) {
+    }
+  }
+
+  function isShortcutBlockedTarget(target) {
+    return Boolean(target) && (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable === true
+    );
+  }
+
+  function isInjectedPacketKey(event) {
+    return event.keyCode === VK_PACKET || event.keyCode === VK_PROCESSKEY;
+  }
+
+  function runShortcutFromEvent(event) {
+    if (isShortcutBlockedTarget(event.target)) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const command = resolveShortcutCommand(event);
+    if (!command) return;
+    if (!isExtensionContextValid()) return;
+    try {
+      const videos = collectVideos(document.documentElement);
+      if (videos.length === 0 && command !== 'toggle-overlay') {
+        forwardShortcutCommand(command);
+        return;
+      }
+      handleShortcut(command, videos);
+    } catch (error) {
+      console.error('Lỗi xử lý phím tắt:', error);
+    }
+  }
+
+  function initKeyListener() {
+    document.addEventListener('keydown', (event) => {
+      if (isShortcutBlockedTarget(event.target)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (!resolveShortcutCommand(event)) return;
+      event.preventDefault();
+      if (event.repeat) {
+        runShortcutFromEvent(event);
       }
     });
+
+    document.addEventListener('keyup', (event) => {
+      if (event.repeat || isInjectedPacketKey(event)) return;
+      runShortcutFromEvent(event);
+    });
+  }
+
+  function mergeSettingsChanges(changes) {
+    const merged = { ...currentSettings };
+
+    Object.keys(changes).forEach((key) => {
+      const nextValue = changes[key].newValue;
+      merged[key] = nextValue === undefined ? DEFAULTS[key] : nextValue;
+    });
+
+    return merged;
   }
 
   function initStorageListener() {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'sync') return;
 
-      getSettings((settings) => {
-        if (changes.showOverlay || changes.overlayOpacity) {
-          updateAllOverlays(settings);
-        }
+      currentSettings = mergeSettingsChanges(changes);
 
-        if (changes.autoApply) {
-        }
-      });
+      if (changes.showOverlay || changes.overlayOpacity) {
+        updateAllOverlays(currentSettings);
+      }
     });
   }
 
@@ -539,6 +694,7 @@
         return;
       }
 
+      currentSettings = settings;
       scanForVideos(settings);
       initMutationObserver();
       initMessageListener();

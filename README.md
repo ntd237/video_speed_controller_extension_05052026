@@ -119,9 +119,10 @@ flowchart LR
 
   CS --> VIDEO
   CS --> OVERLAY
-  CS -- "keyCommand D/S/R/G/V" --> SW
+  CS -- "áp dụng phím tắt tại chỗ" --> VIDEO
+  CS -- "keyCommand (frame không có video)" --> SW
   POPUP -- "keyCommand" --> SW
-  SW -- "setSpeed" --> CS
+  SW -- "keyCommand / setSpeed" --> CS
   POPUP -- "setSpeed / getStatus" --> CS
   STORE -- "onChanged" --> CS
   CS <--> STORE
